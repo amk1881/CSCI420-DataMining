@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import os
 import pandas as pd
 
-# Note, to continue the program must x-out the generated plotting windows
 
 # Sources: Had to look at stack overflow for how to get Gaussian dist, 
 # then again for how to plot stuff. Based on an example. 
@@ -120,15 +119,14 @@ def partC(ax):
     mistakes = []
 
     total_data_count = len(data)
-    print(data[(data['SPEED']) <= 50])
 
     for thresh in thresholds:
-        # false = speeds > thresh 
-        # misses = speeds <= thresh 
-        false_alarms_data = data[(data['SPEED']) <= thresh]
+        # false = speeders > thresh 
+        # misses = speeders <= thresh 
+        false_alarms_data = data[((data['SPEED']) <= thresh) & (data['SPEED'] < 55) ]
         false_alarms_ct = len(false_alarms_data)
 
-        misses_data = data[(data['SPEED']) > thresh]
+        misses_data = data[((data['SPEED']) > thresh) & (data['SPEED'] > 55) ]
         misses_ct = len(misses_data)
 
         total_mistakes = false_alarms_ct + misses_ct
@@ -153,8 +151,28 @@ def partC(ax):
     ax.legend()
 
 
+# Graph for total speeds - used for writeup
+def plot_speed_histogram(data_directory):
+    data = get_data(data_directory)
+    data['SPEED'] = data['SPEED'].round()
+    
+    plt.figure(figsize=(12, 6))
+    plt.hist(data['SPEED'], bins=range(int(data['SPEED'].min()), int(data['SPEED'].max()) + 1), alpha=0.6, label='All Speeds', color='gray')
+
+    speed_limit = 55
+    plt.hist(data[data['SPEED'] > speed_limit]['SPEED'], bins=range(int(data['SPEED'].min()), int(data['SPEED'].max()) + 1), alpha=0.6, label='Speeders (>55 mph)', color='red')
+    plt.hist(data[data['SPEED'] <= speed_limit]['SPEED'], bins=range(int(data['SPEED'].min()), int(data['SPEED'].max()) + 1), alpha=0.6, label='Non-Speeders (≤55 mph)', color='blue')
+
+    plt.xlabel('Speed (mph)')
+    plt.ylabel('Frequency')
+    plt.title('Histogram of Speeds by Intention')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
+
 def main():
-    #fig, axs = plt.subplots(3, 1, figsize=(10, 18))
     fig, axs = plt.subplots(1, 3, figsize=(18, 6))  # Create 1 row, 3 columns of subplots
 
     # Run each part and plot on the respective subplot
@@ -165,6 +183,8 @@ def main():
     plt.tight_layout()
     plt.show()
 
+    #data_directory = 'HW01_Kurchenko_Anna_dir/Traffic_Stations'
+    #plot_speed_histogram(data_directory)
 
 if __name__ == "__main__":
     main()
