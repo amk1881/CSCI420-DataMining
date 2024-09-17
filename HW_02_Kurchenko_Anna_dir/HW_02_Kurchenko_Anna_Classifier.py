@@ -11,7 +11,7 @@ def classify_driver(speed, threshold):
     - int: The intent of the driver (0 for safe, 1 for normal, 2 for aggressive).
     """
     if speed <= threshold:
-        intent = 0  # Safe or normal driver (since 1 is not used in this classifier, adjust as needed)
+        intent = 0  
     else:
-        intent = 2  # Aggressive driver
+        intent = 2 
     return intent
