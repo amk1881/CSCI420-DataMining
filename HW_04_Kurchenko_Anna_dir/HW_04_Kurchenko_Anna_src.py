@@ -1,6 +1,8 @@
 import os
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc
 
 def read_all_training_data(directory_pattern):
     # Get all CSV files matching the pattern
@@ -78,6 +80,12 @@ def main():
                       best_classifier['direction'])
     
 
+    #Part J in HW: 
+    plot_roc_curves(data, [0, 1, 2], data['INTENT'])
+
+
+    
+
 def create_classifier(filename, which_attribute, the_threshold, which_direction):
     with open(f"{filename}.py", 'w') as file:
         file.write(f'''
@@ -109,6 +117,34 @@ if __name__ == "__main__":
                    ''')
         
 
+def plot_roc_curves(data, attributes, intentions):
+    plt.figure(figsize=(6, 6)) 
+    
+    for i, attribute in enumerate(attributes):
+        vals = data.iloc[:, attribute].values
+        true_labels = (intentions == 2).astype(int)  # 1 for aggressive, 0 for non-aggressive
+
+        fpr, tpr, _ = roc_curve(true_labels, vals)
+        roc_auc = auc(fpr, tpr)
+
+        if i == 0:
+            linestyle = 'solid'
+        elif i == 1:
+            linestyle = 'dashed'
+        elif i == 2:
+            linestyle = 'dotted'
+
+        plt.plot(fpr, tpr, label=f'Attribute {attribute} (AUC = {roc_auc:.2f})', linestyle=linestyle)
+
+    plt.plot([0, 1], [0, 1], color='navy', linestyle='--')  
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.0])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curves for Three Attributes')
+    plt.legend(loc='lower right')
+    plt.gca().set_aspect('equal', adjustable='box')  
+    plt.show()
 
 
 if __name__ == "__main__":
