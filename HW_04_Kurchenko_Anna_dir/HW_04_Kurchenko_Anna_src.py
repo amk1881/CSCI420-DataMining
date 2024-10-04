@@ -60,11 +60,11 @@ def main():
             n_behaved_gt_threshold = np.sum(gt_intentions != 2)
 
             if n_aggressive_leq_threshold > n_aggressive_gt_threshold:
-                # If <= threshold, you are aggressive
+                # If <= threshold, aggressive
                 n_mistakes = n_behaved_leq_threshold + n_aggressive_gt_threshold
                 direction_of_classifier = -1
             else:
-                # If > threshold, you are aggressive
+                # If > threshold, aggressive
                 n_mistakes = n_behaved_gt_threshold + n_aggressive_leq_threshold
                 direction_of_classifier = 1
 
