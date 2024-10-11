@@ -11,7 +11,7 @@ import sys
 import numpy as np
 
 
-#This resulting decision tree classifier program looks something like this.
+# This resulting decision tree classifier program looks something like this.
 #    .... header and prologue ...
 #    Given one parameter --
 #    the string containing the filename to read in.
