@@ -147,7 +147,6 @@ def plot_scatter_matrix(df):
 
     print("Saved scatter plots matrix as 'generated_scatter_matrix.png'")
 
-
 """
 Generates a heatmap to visualize the correlation between attributes.
 """
