@@ -111,6 +111,7 @@ def classify(data):
 def main():
     if len(sys.argv) > 1:
         # Load validation data
+        
         validation_data = np.loadtxt(sys.argv[1], delimiter=',')
         for row in range(len(validation_data)):
             intent = classify(validation_data)
