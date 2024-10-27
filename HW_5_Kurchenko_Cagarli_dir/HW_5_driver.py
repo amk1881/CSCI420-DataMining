@@ -1,3 +1,10 @@
+# CSCI 420
+# HW 05
+#
+# Lindsay Cagarli
+# Anna Kurchenko
+
+import sys
 import os
 import pandas as pd
 import numpy as np
@@ -36,16 +43,6 @@ def information_gain_ratio(data, labels, threshold, attribute_index):
     gain_ratio = gain / split_info if split_info != 0 else 0
     
     return gain_ratio, left_split, right_split
-
-
-def read_all_training_data(directory):
-    data = pd.read_csv(directory)
-    
-    numeric_cols = data.select_dtypes(include=[np.number]).columns
-    data[numeric_cols] = np.floor(data[numeric_cols])
-
-    return data
-
 
 '''
 classifier result params: 
@@ -116,64 +113,6 @@ def train_decision_tree(data, labels, max_depth=8, min_leaf_size=5, current_dept
         train_decision_tree(right_data, right_labels, max_depth, min_leaf_size, current_depth + 1)
 
     return best_classifier
-
-
-def main():
-    data = read_all_training_data('TestSuite_C_HasGlasses.csv') 
-    labels = data['INTENT'].values
-    data = data.drop(columns=['INTENT']).values
-    
-    best_classifier = train_decision_tree(data, labels)
-    
-    if best_classifier:
-        print("Best classifier found:", best_classifier)
-        create_classifier(
-            "hw_5_output_classifier", 
-            best_classifier['which_attribute'], 
-            best_classifier['which_threshold'], 
-            best_classifier['which_direction']
-        )
-    
-    validation_data = read_all_training_data('Validation_Data_for_420.csv') 
-
-
-        # Usage example
-    #accuracy = calculate_accuracy(best_classifier, validation_data)
-    #print(f"Classifier Accuracy: {accuracy:.2f}")
-
-
-
-
-def create_classifier(filename, which_attribute, the_threshold, which_direction):
-    with open(f"{filename}.py", 'w') as file:
-        file.write(f'''
-import pandas as pd
-import numpy as np
-
-def read_all_training_data(directory):
-    data = pd.read_csv(directory)
-    
-    numeric_cols = data.select_dtypes(include=[np.number]).columns
-    data[numeric_cols] = np.floor(data[numeric_cols])
-
-    return data
-                   
-def {filename}(filename_in):
-    THE_IMPORTANT_ATTRIBUTE = {which_attribute}
-    THE_IMPORTANT_THRESHOLD = {the_threshold}
-    
-    data = read_all_training_data('TestSuite_C_HasGlasses.csv') 
-
-    n_aggressive = np.sum(data.iloc[:, THE_IMPORTANT_ATTRIBUTE] {which_direction} THE_IMPORTANT_THRESHOLD)
-    n_behaving = np.sum(data.iloc[:, THE_IMPORTANT_ATTRIBUTE] {'>' if which_direction == '<=' else '<='} THE_IMPORTANT_THRESHOLD)
-
-    print(f'n_behaving_well = {{n_behaving}}')
-    print(f'n_aggressive = {{n_aggressive}}')
-
-if __name__ == "__main__":
-    input_file = sys.argv[1]
-    {filename}(input_file)
-                   ''')
         
 
 def plot_roc_curves(data, attributes, intentions):
@@ -205,29 +144,112 @@ def plot_roc_curves(data, attributes, intentions):
     plt.gca().set_aspect('equal', adjustable='box')  
     plt.show()
 
-'''
-def calculate_accuracy(classifier, test_data):
-    # Quantize the test data in the same way as training data
-    numeric_cols = test_data.select_dtypes(include=[np.number]).columns
-    test_data[numeric_cols] = np.floor(test_data[numeric_cols])
+def evaluate_classifier(classifier, validation_data, validation_labels):
+    attribute = classifier['which_attribute']
+    threshold = classifier['which_threshold']
+    direction = classifier['which_direction']
+
+    predictions = (validation_data[:, attribute] <= threshold) if direction == '<=' else (validation_data[:, attribute] > threshold)
+    correct_predictions = np.sum(predictions == (validation_labels == 'PULL_OVER'))  # Assuming 'PULL_OVER' as target label
+    total_predictions = len(validation_labels)
     
-    # Generate predictions for each row in the test data
-    correct_predictions = 0
-    total_predictions = len(test_data)
-    
-    for index, row in test_data.iterrows():
-        true_label = row['INTENT']
-        predicted_label = classifier.predict(row)  # Ensure predict method follows classifier rules
-        
-        if predicted_label == true_label:
-            correct_predictions += 1
-    
-    # Calculate accuracy
     accuracy = correct_predictions / total_predictions
-    return accuracy
+    return accuracy, predictions
 
 
-'''
+def calculate_confusion_matrix(predictions, actual_labels, positive_label='PULL_OVER'):
+    tp = np.sum((predictions == 1) & (actual_labels == positive_label))
+    tn = np.sum((predictions == 0) & (actual_labels != positive_label))
+    fp = np.sum((predictions == 1) & (actual_labels != positive_label))
+    fn = np.sum((predictions == 0) & (actual_labels == positive_label))
+    
+    print("Confusion Matrix:")
+    print(f"TP: {tp}, FP: {fp}")
+    print(f"FN: {fn}, TN: {tn}")
+    return tp, fp, fn, tn
+
+
+def create_classifier(filename, which_attribute, the_threshold, which_direction):
+    with open(f"{filename}.py", 'w') as file:
+        file.write(f'''
+# CSCI 420
+# HW 05
+#
+# Lindsay Cagarli
+# Anna Kurchenko
+                   
+import sys
+import pandas as pd
+import numpy as np
+
+def read_all_training_data(directory):
+    data = pd.read_csv(directory)
+    
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    data[numeric_cols] = np.floor(data[numeric_cols])
+
+    return data
+                   
+def {filename}(filename_in):
+    THE_IMPORTANT_ATTRIBUTE = {which_attribute}
+    THE_IMPORTANT_THRESHOLD = {the_threshold}
+    
+    data = read_all_training_data('TestSuite_C_HasGlasses.csv') 
+
+    n_aggressive = np.sum(data.iloc[:, THE_IMPORTANT_ATTRIBUTE] {which_direction} THE_IMPORTANT_THRESHOLD)
+    n_behaving = np.sum(data.iloc[:, THE_IMPORTANT_ATTRIBUTE] {'>' if which_direction == '<=' else '<='} THE_IMPORTANT_THRESHOLD)
+
+    actual_aggressive = (data['INTENT'] == 'PULL_OVER').sum()
+    actual_behaving =  (data['INTENT'] == 'letpass').sum()
+    
+    correctly_classified = actual_aggressive + actual_behaving
+    total_records = len(data)
+
+    accuracy = correctly_classified / total_records
+    
+    print(f'n_behaving_well = {{n_behaving}}')
+    print(f'n_aggressive = {{n_aggressive}}')
+    print(f'Accuracy = {{accuracy:.2f}}')
+
+if __name__ == "__main__":
+    input_file = sys.argv[1]
+    {filename}(input_file)
+    ''')
+        
+ 
+def read_all_training_data(directory):
+    data = pd.read_csv(directory)
+    
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    data[numeric_cols] = np.floor(data[numeric_cols])
+
+    return data       
+
+def main():
+    file = sys.argv[1] 
+    data = read_all_training_data(file) 
+    labels = data['INTENT'].values
+    data = data.drop(columns=['INTENT']).values
+    
+    best_classifier = train_decision_tree(data, labels)
+    
+    if best_classifier:
+        print("Best classifier found:", best_classifier)
+        create_classifier(
+            "hw_5_output_classifier", 
+            best_classifier['which_attribute'], 
+            best_classifier['which_threshold'], 
+            best_classifier['which_direction']
+        )
+    
+    validation_data = read_all_training_data('Validation_Data_for_420.csv') 
+    validation_labels = validation_data['INTENT'].values
+    validation_data = validation_data.drop(columns=['INTENT']).values
+
+    accuracy, predictions = evaluate_classifier(best_classifier, validation_data, validation_labels)
+    print(f"Classifier Accuracy: {accuracy:.2f}")
+    
+    tp, fp, fn, tn = calculate_confusion_matrix(predictions, validation_labels)    
 
 if __name__ == "__main__":
     main()
