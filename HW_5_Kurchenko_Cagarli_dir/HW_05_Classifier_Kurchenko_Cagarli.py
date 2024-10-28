@@ -61,7 +61,7 @@ def classify_record(record):
         return 'letpass'
 
 def main(filename):
-    # Read and preprocess data
+    # read in data
     data = pd.read_csv(filename)
     numeric_cols = data.select_dtypes(include=[np.number]).columns
     data[numeric_cols] = data[numeric_cols].apply(np.floor)
@@ -78,6 +78,7 @@ def main(filename):
 
 if __name__ == "__main__":
     import sys
+    
     if len(sys.argv) != 2:
         print("Usage: python HW_05_Classifier_Kurchenko_Cagarli.py <input_file>")
         sys.exit(1)

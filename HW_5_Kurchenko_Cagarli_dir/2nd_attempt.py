@@ -1,11 +1,26 @@
+# CSCI 420
+# HW 05
+#
+# Lindsay Cagarli
+# Anna Kurchenko
+
 import sys
 import os
 import pandas as pd
 import numpy as np
 from math import log2
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
+class DTNode:
+    def __init__(self, attribute=None, threshold=None, left=None, right=None, label=None):
+        self.attribute = attribute
+        self.threshold = threshold
+        self.left = left
+        self.right = right
+        self.label = label
 
 def calculate_entropy(labels):
-    """Calculate entropy of a set of labels."""
     if len(labels) == 0:
         return 0
     _, counts = np.unique(labels, return_counts=True)
@@ -14,7 +29,6 @@ def calculate_entropy(labels):
     return entropy
 
 def information_gain_ratio(data, labels, threshold, attribute_index):
-    """Calculate the Information Gain Ratio for a given attribute and threshold."""
     left_mask = data[:, attribute_index] <= threshold
     right_mask = ~left_mask
     
@@ -26,53 +40,40 @@ def information_gain_ratio(data, labels, threshold, attribute_index):
     left_entropy = calculate_entropy(labels[left_mask])
     right_entropy = calculate_entropy(labels[right_mask])
     
-    # Calculate weighted entropy
+    #  weighted entropy
     n_left, n_right = left_mask.sum(), right_mask.sum()
     total = n_left + n_right
     weighted_entropy = (n_left * left_entropy + n_right * right_entropy) / total
     
-    # Calculate information gain
     info_gain = parent_entropy - weighted_entropy
-    
-    # Calculate split information
     split_info = -((n_left/total) * log2(n_left/total) + (n_right/total) * log2(n_right/total))
     
-    # Avoid division by zero
+    # to avoid division by zero
     gain_ratio = info_gain / split_info if split_info != 0 else 0
     
     return gain_ratio, left_mask, right_mask
 
+
 def get_majority_class(labels):
-    """Return the majority class in a set of labels."""
     unique_labels, counts = np.unique(labels, return_counts=True)
     return unique_labels[np.argmax(counts)]
 
-class DecisionTreeNode:
-    def __init__(self, attribute=None, threshold=None, left=None, right=None, label=None):
-        self.attribute = attribute
-        self.threshold = threshold
-        self.left = left
-        self.right = right
-        self.label = label
-
-def train_decision_tree(data, labels, feature_names, max_depth=8, min_samples=5, current_depth=0):
-    """
-    Train a decision tree recursively.
-    Returns a DecisionTreeNode object representing the tree.
-    """
+'''
+Train a DT recursively using the DecisionTree Node class 
+'''
+def train_dt(data, labels, feature_names, max_depth=8, min_samples=5, current_depth=0):
     # Base cases
     if current_depth >= max_depth or len(labels) < min_samples:
-        return DecisionTreeNode(label=get_majority_class(labels))
+        return DTNode(label=get_majority_class(labels))
     
     # Check if the node is pure enough (90% one class)
     unique_labels, counts = np.unique(labels, return_counts=True)
     if len(unique_labels) == 1 or max(counts) / len(labels) >= 0.9:
-        return DecisionTreeNode(label=get_majority_class(labels))
+        return DTNode(label=get_majority_class(labels))
     
     best_gain = -1
     best_split = None
     
-    # Try each feature and threshold
     for feature_idx in range(data.shape[1]):
         unique_values = np.unique(data[:, feature_idx])
         for threshold in unique_values:
@@ -87,37 +88,34 @@ def train_decision_tree(data, labels, feature_names, max_depth=8, min_samples=5,
                     'right_mask': right_mask
                 }
     
-    # If no good split found, return leaf node
+    # return leaf node if no good split found 
     if best_gain <= 0:
-        return DecisionTreeNode(label=get_majority_class(labels))
+        return DTNode(label=get_majority_class(labels))
     
-    # Create child nodes
     left_data = data[best_split['left_mask']]
     right_data = data[best_split['right_mask']]
     left_labels = labels[best_split['left_mask']]
     right_labels = labels[best_split['right_mask']]
     
-    node = DecisionTreeNode(
+    node = DTNode(
         attribute=feature_names[best_split['feature_idx']],
         threshold=best_split['threshold'],
-        left=train_decision_tree(left_data, left_labels, feature_names, max_depth, min_samples, current_depth + 1),
-        right=train_decision_tree(right_data, right_labels, feature_names, max_depth, min_samples, current_depth + 1)
+        left=train_dt(left_data, left_labels, feature_names, max_depth, min_samples, current_depth + 1),
+        right=train_dt(right_data, right_labels, feature_names, max_depth, min_samples, current_depth + 1)
     )
     
     return node
 
-def generate_python_code(node, indent=""):
-    """Generate Python code for the decision tree classifier."""
+def code_gen_helper(node, indent=""):
     if node.label is not None:
         return f"{indent}return '{node.label}'"
     
     return f"""{indent}if record['{node.attribute}'] <= {node.threshold}:
-{generate_python_code(node.left, indent + "    ")}
+{code_gen_helper(node.left, indent + "    ")}
 {indent}else:
-{generate_python_code(node.right, indent + "    ")}"""
+{code_gen_helper(node.right, indent + "    ")}"""
 
 def create_classifier_file(tree, output_filename):
-    """Create a Python file containing the trained classifier."""
     code = f"""
 # CSCI 420 HW 05
 # Lindsay Cagarli
@@ -127,10 +125,10 @@ import pandas as pd
 import numpy as np
 
 def classify_record(record):
-{generate_python_code(tree, "    ")}
+{code_gen_helper(tree, "    ")}
 
 def main(filename):
-    # Read and preprocess data
+    # read in data
     data = pd.read_csv(filename)
     numeric_cols = data.select_dtypes(include=[np.number]).columns
     data[numeric_cols] = data[numeric_cols].apply(np.floor)
@@ -147,6 +145,7 @@ def main(filename):
 
 if __name__ == "__main__":
     import sys
+    
     if len(sys.argv) != 2:
         print("Usage: python {output_filename}.py <input_file>")
         sys.exit(1)
@@ -156,14 +155,14 @@ if __name__ == "__main__":
     with open(f"{output_filename}.py", 'w') as f:
         f.write(code)
 
-
+# prediction for single reord in DT
 def predict_single(tree, record):
-    """Make a prediction for a single record using the decision tree."""
     if tree.label is not None:
         return tree.label
     
     if record[tree.attribute] <= tree.threshold:
         return predict_single(tree.left, record)
+    
     else:
         return predict_single(tree.right, record)
 
@@ -186,6 +185,7 @@ def main():
     aggressive = training_data[training_data['INTENT'] == 'PULL_OVER']
     non_aggressive = training_data[training_data['INTENT'] == 'letpass']
     min_samples = min(len(aggressive), len(non_aggressive))
+
     balanced_data = pd.concat([
         aggressive.sample(min_samples, random_state=42),
         non_aggressive.sample(min_samples, random_state=42)
@@ -197,12 +197,36 @@ def main():
     
     X = np.floor(X)
     
-    tree = train_decision_tree(X, y, feature_names, max_depth=8, min_samples=5)
+    tree = train_dt(X, y, feature_names, max_depth=8, min_samples=5)
     
-    train_accuracy, _ = evaluate_classifier(tree, balanced_data[feature_names], balanced_data['INTENT'])
+    train_accuracy, predictions = evaluate_classifier(tree, balanced_data[feature_names], balanced_data['INTENT'])
     print('training_accuracy is: ', train_accuracy)
+
     create_classifier_file(tree, "HW_05_Classifier_Kurchenko_Cagarli")
     
+    original_ft_names = training_data.columns.drop('INTENT').tolist()
+    confusion_matrix_original_data(training_data, original_ft_names, tree)
+
+
+def confusion_matrix_original_data(training_data, feature_names, tree):
+# Make predictions on the original training data
+    original_X = training_data[feature_names].values
+    original_X = np.floor(original_X)
+    original_y = training_data['INTENT'].values
+
+    original_predictions = []
+    for _, record in pd.DataFrame(original_X).iterrows():
+        pred = predict_single(tree, record)
+        original_predictions.append(pred)
+
+    # Generate the confusion matrix for the original data
+    cm = confusion_matrix(original_y, original_predictions, labels=['PULL_OVER', 'letpass'])
+    
+    # Display the confusion matrix
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['PULL_OVER', 'letpass'])
+    disp.plot(cmap=plt.cm.Blues)
+    plt.title('Confusion Matrix on Original Training Data')
+    plt.show()
     
 
 if __name__ == "__main__":
