@@ -18,7 +18,7 @@ def read_all_training_data(directory):
     return data
                    
 def hw_5_output_classifier(filename_in):
-    THE_IMPORTANT_ATTRIBUTE = 12
+    THE_IMPORTANT_ATTRIBUTE = SideDents
     THE_IMPORTANT_THRESHOLD = 0.0
     
     data = read_all_training_data('TestSuite_C_HasGlasses.csv') 
