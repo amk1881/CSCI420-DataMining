@@ -72,14 +72,15 @@ def main(filename):
         prediction = classify_record(record)
         predictions.append(prediction)
     
-    # Save predictions to CSV
-    results_df = pd.DataFrame({'INTENT': predictions})
-    results_df.to_csv('HW_05_Kurchenko_Cagarli_MyClassifications.csv', index=False)
+    # Save predictions and output 
+    predictions_string = ','.join(predictions) 
+    with open('HW_05_Kurchenko_Cagarli_MyClassifications.csv', 'w') as f:
+        f.write(predictions_string) 
 
 if __name__ == "__main__":
     import sys
     
     if len(sys.argv) != 2:
-        print("Usage: python HW_05_Classifier_Kurchenko_Cagarli.py <input_file>")
+        print("Usage: python HW_05_Kurchenko_Cagarli_Classifier.py <input_file>")
         sys.exit(1)
     main(sys.argv[1])

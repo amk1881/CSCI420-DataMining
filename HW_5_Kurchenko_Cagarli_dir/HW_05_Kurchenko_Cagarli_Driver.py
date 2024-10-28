@@ -9,8 +9,6 @@ import os
 import pandas as pd
 import numpy as np
 from math import log2
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-import matplotlib.pyplot as plt
 
 class DTNode:
     def __init__(self, attribute=None, threshold=None, left=None, right=None, label=None):
@@ -139,9 +137,10 @@ def main(filename):
         prediction = classify_record(record)
         predictions.append(prediction)
     
-    # Save predictions to CSV
-    results_df = pd.DataFrame({{'INTENT': predictions}})
-    results_df.to_csv('HW_05_Kurchenko_Cagarli_MyClassifications.csv', index=False)
+    # Save predictions and output 
+    predictions_string = ','.join(predictions) 
+    with open('HW_05_Kurchenko_Cagarli_MyClassifications.csv', 'w') as f:
+        f.write(predictions_string) 
 
 if __name__ == "__main__":
     import sys
@@ -155,6 +154,7 @@ if __name__ == "__main__":
     with open(f"{output_filename}.py", 'w') as f:
         f.write(code)
 
+
 # prediction for single reord in DT
 def predict_single(tree, record):
     if tree.label is not None:
@@ -165,6 +165,7 @@ def predict_single(tree, record):
     
     else:
         return predict_single(tree.right, record)
+
 
 def evaluate_classifier(tree, data, labels):
     predictions = []
@@ -202,32 +203,7 @@ def main():
     train_accuracy, predictions = evaluate_classifier(tree, balanced_data[feature_names], balanced_data['INTENT'])
     print('training_accuracy is: ', train_accuracy)
 
-    create_classifier_file(tree, "HW_05_Classifier_Kurchenko_Cagarli")
-    
-    original_ft_names = training_data.columns.drop('INTENT').tolist()
-    confusion_matrix_original_data(training_data, original_ft_names, tree)
-
-
-def confusion_matrix_original_data(training_data, feature_names, tree):
-# Make predictions on the original training data
-    original_X = training_data[feature_names].values
-    original_X = np.floor(original_X)
-    original_y = training_data['INTENT'].values
-
-    original_predictions = []
-    for _, record in pd.DataFrame(original_X).iterrows():
-        pred = predict_single(tree, record)
-        original_predictions.append(pred)
-
-    # Generate the confusion matrix for the original data
-    cm = confusion_matrix(original_y, original_predictions, labels=['PULL_OVER', 'letpass'])
-    
-    # Display the confusion matrix
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['PULL_OVER', 'letpass'])
-    disp.plot(cmap=plt.cm.Blues)
-    plt.title('Confusion Matrix on Original Training Data')
-    plt.show()
-    
+    create_classifier_file(tree, "HW_05_Kurchenko_Cagarli_Classifier")
 
 if __name__ == "__main__":
     main()
