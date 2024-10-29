@@ -205,13 +205,33 @@ def main():
 
     create_classifier_file(tree, "HW_05_Kurchenko_Cagarli_Classifier")
 
+    important_attrs = get_important_attributes(tree)
+    sorted_importance = sorted(important_attrs.items(), key=lambda item: item[1])
+
+    print("Most Important Attributes:")
+    for attribute, depth in sorted_importance:
+        print(f"{attribute} (Depth: {depth})")
+
+
+def get_important_attributes(node, depth=0, max_depth=3, important_attributes=None):
+    if important_attributes is None:
+        important_attributes = {}
+
+    if depth >= max_depth or node is None:
+        return important_attributes
+
+    if node.attribute:
+        if node.attribute not in important_attributes:
+            important_attributes[node.attribute] = depth
+        else:
+            important_attributes[node.attribute] = min(important_attributes[node.attribute], depth)
+
+    get_important_attributes(node.left, depth + 1, max_depth, important_attributes)
+    get_important_attributes(node.right, depth + 1, max_depth, important_attributes)
+
+    return important_attributes
+
+
+
 if __name__ == "__main__":
     main()
-
-    '''
-    The improvements should significantly increase your accuracy from the current 0.23. The main reasons for the improved accuracy are:
-
-Balanced dataset preventing bias
-Better split selection using proper information gain ratio
-Proper tree structure with appropriate stopping conditions
-Handling of edge cases and numerical precision'''
