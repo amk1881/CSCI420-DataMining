@@ -76,7 +76,6 @@ def print_cross_correlations(data, output_file='cross_correlations.tsv'):
     for pair, correlation in cross_correlations_sorted[:10]:
         print(f"{pair}: {correlation:.2f}")
 
-    # print highest correlated things bought
 
 
 
