@@ -16,6 +16,7 @@ import csv
 
 
 FILENAME = 'HW_CLUSTERING_SHOPPING_CART_v2241a.csv'
+OUTPUT_FILE = 'agglomeration_out.txt'
 # '100_DATA_POINTS.csv'
 # '2_CLUSTERING_SAMPLE.csv' 
 # 'HW_CLUSTERING_SHOPPING_CART_v2241a.csv'
@@ -81,48 +82,55 @@ def print_cross_correlations(data, output_file='cross_correlations.tsv'):
 def agglomerative_clustering(data):
     
     smallest_clusters = []  
-    
+    cluster_sizes = [1] * len(data)
     # initialize each point as its own cluster and set its center
     clusters = [{i: data[i]} for i in range(len(data))]  
     cluster_centers = [data[i] for i in range(len(data))]  
 
-    # clustering loop
-    while len(clusters) > 1:
-        
-        # find points with the min L1 distance
-        min_distance = float('inf')
-        to_merge = (0, 0)
+    with open(OUTPUT_FILE, 'w') as file:
+        file.write("Cluster Merging Process:\n\n")
+        # clustering loop
+        while len(clusters) > 1:
+            
+            # find points with the min L1 distance
+            min_distance = float('inf')
+            to_merge = (0, 0)
 
-        for i in range(len(cluster_centers)):
-            for j in range(i + 1, len(cluster_centers)):    
+            for i in range(len(cluster_centers)):
+                for j in range(i + 1, len(cluster_centers)):    
+                    
+                    # L1 distance calculation
+                    dist = np.sum(np.abs(cluster_centers[i] - cluster_centers[j]))
                 
-                # L1 distance calculation
-                dist = np.sum(np.abs(cluster_centers[i] - cluster_centers[j]))
-              
-                # check if it is the new smallest distance
-                if dist < min_distance:
-                    min_distance = dist
-                    to_merge = (i, j)
+                    # check if it is the new smallest distance
+                    if dist < min_distance:
+                        min_distance = dist
+                        to_merge = (i, j)
 
-        # merge the two clusters
-        idx1, idx2 = to_merge
-        new_cluster = {**clusters[idx1], **clusters[idx2]}  # merged cluster
-        new_center = np.mean(list(new_cluster.values()))    # get new centroid
+            # merge the two clusters
+            idx1, idx2 = to_merge
+            new_cluster = {**clusters[idx1], **clusters[idx2]}  # merged cluster
+            new_center = np.mean(list(new_cluster.values()))    # get new centroid
+            
+            cluster_centers[idx1] = new_center
+            clusters[idx1] = new_cluster
+            cluster_sizes[idx1] = len(new_cluster)
+            intermediate_cluster_sizes = []
+            
+            file.write(f"Cluster Size: {len(new_cluster)}, Average Prototype: {new_center}\n")
+            
+            del clusters[idx2]
+            del cluster_centers[idx2]
+            del cluster_sizes[idx2]
         
-        cluster_centers[idx1] = new_center
-        clusters[idx1] = new_cluster
-        
-        del clusters[idx2]
-        del cluster_centers[idx2]
+            # record the size of the smallest cluster being merged
+            smallest_cluster_size = min(len(clusters[idx1]), len(clusters[idx2]) if idx2 < len(clusters) else 0)
+            smallest_clusters.append(smallest_cluster_size)
 
-        # record the size of the smallest cluster being merged
-        smallest_cluster_size = min(len(clusters[idx1]), len(clusters[idx2]) if idx2 < len(clusters) else 0)
-        smallest_clusters.append(smallest_cluster_size)
-
-        # keep only the last 20 smallest cluster sizes merged
-        if len(smallest_clusters) > 20:
-            smallest_clusters.pop(0)
-
+            # keep only the last 20 smallest cluster sizes merged
+            if len(smallest_clusters) > 20:
+                smallest_clusters.pop(0)
+            
     # return the final cluster structure and the last 10 smallest clusters merged
     return smallest_clusters[-10:]
 
@@ -141,7 +149,7 @@ def create_dendrogram(data):
 #
 def main():
     data = get_data()
-    print_cross_correlations(data)
+    #print_cross_correlations(data)
     last_10_smallest_clusters = agglomerative_clustering(data)
     print("\nLast 10 smallest clusters merged:", last_10_smallest_clusters)
     create_dendrogram(data)
