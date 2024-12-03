@@ -3,6 +3,8 @@ import sys
 from datetime import datetime, timedelta
 from geopy.distance import geodesic
 
+# site to auto-parse gps data for checking: https://swairlearn.bluecover.pt/nmea_analyser
+
 # Constants
 MIN_SPEED_THRESHOLD = 0.5  # Minimum speed in m/s for valid data
 MAX_POINTS_PER_PATH = 20000  # Maximum number of points in one path
@@ -10,46 +12,70 @@ DATA_START_REGEX = r'^\$GPRMC'  # Data starts with this regex
 VALID_FIX_QUALITY = {1, 2}  # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
 
 
+def parseGRMC(fields): 
+    time_utc = fields[1]
+    status = fields[2]
+    latitude = float(fields[3]) if fields[3] else None
+    lat_dir = fields[4]
+    longitude = float(fields[5]) if fields[5] else None
+    long_dir = fields[6]
+    speed = float(fields[7]) * 0.514444  # Convert knots to m/s
+    heading = float(fields[8]) if fields[8] else None
+    date = fields[9]
+
+    if latitude and lat_dir == 'S':
+        latitude = -latitude
+    if longitude and long_dir == 'W':
+        longitude = -longitude
+
+    datetime_utc = datetime.strptime(date + time_utc[:6], '%d%m%y%H%M%S')
+    return datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading
+
+
+def parseGPGGA(fields): 
+    altitude = float(fields[9]) if fields[9] else None
+    fix_quality = int(fields[6]) if fields[6] else None
+    return altitude, fix_quality
+
 def parse_gps_line(line):
     """
     Parse a GPS data line to extract relevant fields.
     """
+    final_data  = []
     try:
         if line.startswith('$GPRMC'):
             fields = line.split(',')
-            time_utc = fields[1]
-            status = fields[2]
-            latitude = float(fields[3]) if fields[3] else None
-            lat_dir = fields[4]
-            longitude = float(fields[5]) if fields[5] else None
-            long_dir = fields[6]
-            speed = float(fields[7]) * 0.514444  # Convert knots to m/s
-            heading = float(fields[8]) if fields[8] else None
-            date = fields[9]
+            datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading = parseGRMC(fields)
+            parsed_fields = [datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading]
+            final_data.extend(parsed_fields)
+            
+            #This happens if arduino eats a nl 
+            if '$GPGGA' in line:
+                altitude, fix_quality = parseGPGGA(fields)
+                parsed_fields = [altitude, fix_quality]
+                final_data.extend(parsed_fields)
 
-            if latitude and lat_dir == 'S':
-                latitude = -latitude
-            if longitude and long_dir == 'W':
-                longitude = -longitude
 
-            datetime_utc = datetime.strptime(date + time_utc[:6], '%d%m%y%H%M%S')
-            return datetime_utc, latitude, longitude, speed, heading, status == 'A'
+        # pretty sure we only care about the altitude here
         elif line.startswith('$GPGGA'):
             fields = line.split(',')
-            altitude = float(fields[9]) if fields[9] else None
-            fix_quality = int(fields[6]) if fields[6] else None
-            return altitude, fix_quality
-        elif line.startswith("lng="):
-            match = re.match(r'lng=([\-\d\.]+), lat=([\-\d\.]+),.*speed=([\d\.]+)', line)
-            if match:
-                longitude, latitude, speed = map(float, match.groups())
-                return latitude, longitude, speed
-        return None
+            altitude, fix_quality = parseGPGGA(fields)
+            parsed_fields = [altitude, fix_quality]
+            final_data.extend(parsed_fields)
+
+            #This happens if arduino eats a nl 
+            if '$GRMPC' in line:
+                datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading = parseGRMC(fields)
+                parsed_fields = [datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading]
+                final_data.extend(parsed_fields)
+
+
+        return final_data
     except ValueError:
         return None
 
 
-#gotten from website in writeup 
+#gotten from website in writeup, this works but is missing check of GPGGA 
 def parseGPS(data):
 #    print "raw:", data #prints raw data
     if data[0:6] == "$GPRMC":
@@ -130,7 +156,7 @@ def main():
 
     parsed_data = []
     for line in raw_data:
-        parsed = parseGPS(line.strip())
+        parsed = parse_gps_line(line.strip())
         if parsed and isinstance(parsed, tuple) and len(parsed) > 4:
             parsed_data.append(parsed)
     
