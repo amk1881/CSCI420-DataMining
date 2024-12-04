@@ -1,3 +1,10 @@
+'''
+Project 2 : Data Mining with NMEA GPS Data 
+Anna Kurchenko and Lindsay Cagarli 
+12/4/24
+
+'''
+
 import re
 import sys
 from datetime import datetime, timedelta
@@ -12,8 +19,8 @@ DATA_START_REGEX = r'^\$GPRMC'  # Data starts with this regex
 VALID_FIX_QUALITY = {1, 2}  # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
 
 
-# parse all fields of GRMPC line 
-def parseGRMPC(fields, parsed_line): 
+# parse all fields from GRMPC line 
+def parse_GRMPC(fields, parsed_line): 
     time_utc = fields[1]
     status = fields[2]
     latitude = float(fields[3]) if fields[3] else None
@@ -38,11 +45,11 @@ def parseGRMPC(fields, parsed_line):
     parsed_line["speed"] = speed
     parsed_line["heading"] = heading
 
-    return parsed_line #datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading
+    return parsed_line 
 
 
-# parse all fields of GPGGA line 
-def parseGPGGA(fields, parsed_line): 
+# parse all fields from GPGGA line 
+def parse_GPGGA(fields, parsed_line): 
     altitude = float(fields[9]) if fields[9] else None
     fix_quality = int(fields[6]) if fields[6] else None
 
@@ -50,11 +57,12 @@ def parseGPGGA(fields, parsed_line):
     parsed_line["fix_quality"] = fix_quality
     return parsed_line
 
-
-# Parse a GPS data line to extract relevant fields.
-# Returns list of all parsed lines 
-#   Each line captured by a dict of all its fields 
-def parse_gps_line(filename):
+'''
+ Clean and parse a GPS data line and extract relevant fields.
+ Returns list of all parsed lines 
+   Each line captured by a dict of all its fields 
+'''
+def parsed_gps_lines(filename):
     with open(filename, 'r') as file:
         final_data = []
 
@@ -66,18 +74,18 @@ def parse_gps_line(filename):
                 line2 = file.readline().strip()
                 #print("line1 is :" , line1, "\nline2 is :" , line2)
                 fields = line1.split(',')
-                parsed_line = parseGRMPC(fields, parsed_line)
+                parsed_line = parse_GRMPC(fields, parsed_line)
 
                 
                 #This happens if arduino eats a nl 
                 if '$GPGGA' in line1:
-                    parsed_line = parseGPGGA(fields, parsed_line)
+                    parsed_line = parse_GPGGA(fields, parsed_line)
 
 
                 # pretty sure we only care about the altitude here
                 elif line2.startswith('$GPGGA'):
                     fields = line2.split(',')
-                    parsed_line = parseGPGGA(fields, parsed_line)
+                    parsed_line = parse_GPGGA(fields, parsed_line)
                     
                 else: 
                     parsed_line["altitude"] = None 
@@ -85,16 +93,16 @@ def parse_gps_line(filename):
             
             # Capture lines that are missing GRMPC data, only have unpaired GPGGA data as NONE, 
             # since there is not enough info to only use GPGGA, this is assuming that lng will also not be recorded 
-            elif not line1.startswith('lng'): 
+            elif line1.startswith('GPGGA'): 
                 parsed_line["datetime"] = None
             
-            print("parsedline: ", parsed_line)
-            final_data.append(parsed_line)
+            
+            # skip empty lines 
+            if len(parsed_line) > 0: 
+                final_data.append(parsed_line)
         
         return final_data
             
-
-
 
 def filter_data(data):
     """
@@ -142,20 +150,28 @@ def split_paths(data):
     return paths
 
 
+'''
+What day did the trip occur.  Report this as YYYY/MM/DD, 
+For example, 2024/09/23 for Sept 23rd. (5) 
+2. What time of day did the trip start. 
+Use UTC for this.  That’s fine.   
+Report this as HH:MM, with HH as a 24-hour clock'''
+def trip_date_occurance(parsed_data):
+    date  = parsed_data[0]["datetime"].datetime.now()
+    print($"Collected Trip Occured on: {now}")
+    print(isinstance(parsed_data[0]["datetime"], datetime))
+
+    
+
+
+
+
+# Main subroutine navigating full functionality 
 def main():
     filename = sys.argv[1]
-    final_data = parse_gps_line(filename)
-    '''
-    with open(filename, 'r') as file:
-        raw_data = file.readlines()
+    parsed_data = parsed_gps_lines(filename)
 
-    parsed_data = []
-    for line in raw_data:
-        parsed_line = parse_gps_line(filename, raw_data, line.strip())
-        print(parsed_line)
-        if parsed_line and isinstance(parsed_line, tuple) and len(parsed_line) > 4:
-            parsed_data.append(parsed_line)
-    '''
+    trip_date_occurance(parsed_data)
 
     '''
     filtered_data = filter_data(parsed_data)
