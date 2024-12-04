@@ -12,7 +12,8 @@ DATA_START_REGEX = r'^\$GPRMC'  # Data starts with this regex
 VALID_FIX_QUALITY = {1, 2}  # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
 
 
-def parseGRMC(fields): 
+# parse all fields of GRMPC line 
+def parseGRMPC(fields, parsed_line): 
     time_utc = fields[1]
     status = fields[2]
     latitude = float(fields[3]) if fields[3] else None
@@ -29,78 +30,71 @@ def parseGRMC(fields):
         longitude = -longitude
 
     datetime_utc = datetime.strptime(date + time_utc[:6], '%d%m%y%H%M%S')
-    return datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading
+    parsed_line["datetime"] = datetime_utc
+    parsed_line["latitude"] = latitude
+    parsed_line["longitude"] = longitude
+    parsed_line["lat_dir"] = lat_dir
+    parsed_line["long_dir"] = long_dir
+    parsed_line["speed"] = speed
+    parsed_line["heading"] = heading
+
+    return parsed_line #datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading
 
 
-def parseGPGGA(fields): 
+# parse all fields of GPGGA line 
+def parseGPGGA(fields, parsed_line): 
     altitude = float(fields[9]) if fields[9] else None
     fix_quality = int(fields[6]) if fields[6] else None
-    return altitude, fix_quality
 
-def parse_gps_line(line):
-    """
-    Parse a GPS data line to extract relevant fields.
-    """
-    final_data  = []
-    try:
-        if line.startswith('$GPRMC'):
-            fields = line.split(',')
-            datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading = parseGRMC(fields)
-            parsed_fields = [datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading]
-            final_data.extend(parsed_fields)
+    parsed_line["altitude"] = altitude
+    parsed_line["fix_quality"] = fix_quality
+    return parsed_line
+
+
+# Parse a GPS data line to extract relevant fields.
+# Returns list of all parsed lines 
+#   Each line captured by a dict of all its fields 
+def parse_gps_line(filename):
+    with open(filename, 'r') as file:
+        final_data = []
+
+        for line1 in file:
+            line1.strip()
+            parsed_line  = {}
+
+            if line1.startswith('$GPRMC'):
+                line2 = file.readline().strip()
+                #print("line1 is :" , line1, "\nline2 is :" , line2)
+                fields = line1.split(',')
+                parsed_line = parseGRMPC(fields, parsed_line)
+
+                
+                #This happens if arduino eats a nl 
+                if '$GPGGA' in line1:
+                    parsed_line = parseGPGGA(fields, parsed_line)
+
+
+                # pretty sure we only care about the altitude here
+                elif line2.startswith('$GPGGA'):
+                    fields = line2.split(',')
+                    parsed_line = parseGPGGA(fields, parsed_line)
+                    
+                else: 
+                    parsed_line["altitude"] = None 
+                    parsed_line["fix_quality"] = None 
             
-            #This happens if arduino eats a nl 
-            if '$GPGGA' in line:
-                altitude, fix_quality = parseGPGGA(fields)
-                parsed_fields = [altitude, fix_quality]
-                final_data.extend(parsed_fields)
-
-
-        # pretty sure we only care about the altitude here
-        elif line.startswith('$GPGGA'):
-            fields = line.split(',')
-            altitude, fix_quality = parseGPGGA(fields)
-            parsed_fields = [altitude, fix_quality]
-            final_data.extend(parsed_fields)
-
-            #This happens if arduino eats a nl 
-            if '$GRMPC' in line:
-                datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading = parseGRMC(fields)
-                parsed_fields = [datetime_utc, latitude, longitude, lat_dir, long_dir, speed, heading]
-                final_data.extend(parsed_fields)
-
-
+            # Capture lines that are missing GRMPC data, only have unpaired GPGGA data as NONE, 
+            # since there is not enough info to only use GPGGA, this is assuming that lng will also not be recorded 
+            elif not line1.startswith('lng'): 
+                parsed_line["datetime"] = None
+            
+            print("parsedline: ", parsed_line)
+            final_data.append(parsed_line)
+        
         return final_data
-    except ValueError:
-        return None
+            
 
 
-#gotten from website in writeup, this works but is missing check of GPGGA 
-def parseGPS(data):
-#    print "raw:", data #prints raw data
-    if data[0:6] == "$GPRMC":
-        sdata = data.split(",")
-        if sdata[2] == 'V':
-            print("no satellite data available")
-            return
-        print("---Parsing GPRMC---")
-        time = sdata[1][0:2] + ":" + sdata[1][2:4] + ":" + sdata[1][4:6]
-        lat = decode(sdata[3]) #latitude
-        dirLat = sdata[4]      #latitude direction N/S
-        lon = decode(sdata[5]) #longitute
-        dirLon = sdata[6]      #longitude direction E/W
-        speed = sdata[7]       #Speed in knots
-        trCourse = sdata[8]    #True course
-        date = sdata[9][0:2] + "/" + sdata[9][2:4] + "/" + sdata[9][4:6]#date
-        print("time : %s, latitude : %s(%s), longitude : %s(%s), speed : %s, True Course : %s, Date : %s" %  (time,lat,dirLat,lon,dirLon,speed,trCourse,date))
-def decode(coord):
-    #Converts DDDMM.MMMMM > DD deg MM.MMMMM min
-    x = coord.split(".")
-    head = x[0]
-    tail = x[1]
-    deg = head[0:-2]
-    min = head[-2:]
-    return deg + " deg " + min + "." + tail + " min"
 
 def filter_data(data):
     """
@@ -150,16 +144,19 @@ def split_paths(data):
 
 def main():
     filename = sys.argv[1]
-
+    final_data = parse_gps_line(filename)
+    '''
     with open(filename, 'r') as file:
         raw_data = file.readlines()
 
     parsed_data = []
     for line in raw_data:
-        parsed = parse_gps_line(line.strip())
-        if parsed and isinstance(parsed, tuple) and len(parsed) > 4:
-            parsed_data.append(parsed)
-    
+        parsed_line = parse_gps_line(filename, raw_data, line.strip())
+        print(parsed_line)
+        if parsed_line and isinstance(parsed_line, tuple) and len(parsed_line) > 4:
+            parsed_data.append(parsed_line)
+    '''
+
     '''
     filtered_data = filter_data(parsed_data)
     duration = compute_drive_duration(filtered_data)
