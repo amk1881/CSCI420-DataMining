@@ -155,23 +155,113 @@ What day did the trip occur.  Report this as YYYY/MM/DD,
 For example, 2024/09/23 for Sept 23rd. (5) 
 2. What time of day did the trip start. 
 Use UTC for this.  That’s fine.   
-Report this as HH:MM, with HH as a 24-hour clock'''
+Report this as HH:MM, with HH as a 24-hour clock
+'''
 def trip_date_occurance(parsed_data):
-    date  = parsed_data[0]["datetime"].datetime.now()
-    print($"Collected Trip Occured on: {now}")
-    print(isinstance(parsed_data[0]["datetime"], datetime))
+    date  = parsed_data[0]["datetime"].date().strftime('%Y/%m/%d')
+    print(f"GPS Trip Occured on: {date}")
 
+    time  = parsed_data[0]["datetime"].time()
+    print(f"Trip started at time : {time}")
+
+
+
+
+from math import radians, sin, cos, sqrt, atan2
+
+def is_near_location(coord, target, radius=0.5):
+    """
+    Checks if a coordinate is within a given radius of a target location.
     
+    Parameters:
+        coord (tuple): Tuple of (latitude, longitude) for the trip point.
+        target (tuple): Tuple of (latitude, longitude) for the target location.
+        radius (float): Distance in kilometers to consider 'near'. Default is 0.5 km.
+        
+    Returns:
+        bool: True if the coordinate is within the radius of the target location.
+    """
+    # Haversine formula
+    R = 6371.0  # Earth's radius in kilometers
+    lat1, lon1 = radians(coord[0]), radians(coord[1])
+    lat2, lon2 = radians(target[0]), radians(target[1])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    distance = R * c
+
+    return distance <= radius
+
+def trip_started_near_location(trip_data, location_a, radius=0.5):
+    """
+    Determines if the trip started near a given location.
+    
+    Parameters:
+        trip_data (list): List of dictionaries containing parsed GPS data.
+        location_a (tuple): Tuple of (latitude, longitude) for location A.
+        radius (float): Distance in kilometers to consider 'near'. Default is 0.5 km.
+        
+    Returns:
+        bool: True if the trip started near location A.
+    """
+    if not trip_data:
+        return False
+    start_point = (trip_data[0]['latitude'], trip_data[0]['longitude'])
+    return is_near_location(start_point, location_a, radius)
+
+
+def trip_ended_near_location(trip_data, location_b, radius=0.5):
+    """
+    Determines if the trip ended near a given location.
+    
+    Parameters:
+        trip_data (list): List of dictionaries containing parsed GPS data.
+        location_b (tuple): Tuple of (latitude, longitude) for location B.
+        radius (float): Distance in kilometers to consider 'near'. Default is 0.5 km.
+        
+    Returns:
+        bool: True if the trip ended near location B.
+    """
+    if not trip_data:
+        return False
+    end_point = (trip_data[-1]['latitude'], trip_data[-1]['longitude'])
+    return is_near_location(end_point, location_b, radius)
 
 
 
+'''
+RIT Lat long: 
+82 Lomb Memorial Drive, Rochester, NY 14623
+Henrietta New York United States
+lat : 43.086065
+long: -77.68094333
+
+
+Kinsman Address: 
+1182 Whalen Road, Penfield, NY 14526
+Penfield New York United States
+lat: 43.14122833
+long: -77.44047
+
+'''
 
 # Main subroutine navigating full functionality 
 def main():
+
     filename = sys.argv[1]
     parsed_data = parsed_gps_lines(filename)
+    print(parsed_data)
 
     trip_date_occurance(parsed_data)
+
+    RIT_location = (43.086065, -77.68094333)
+    Kinsman_res_location = (43.14122833, -77.44047)
+
+    print(trip_started_near_location(trip_data, location_a))  # True
+    print(trip_ended_near_location(trip_data, location_b))    # True
+
 
     '''
     filtered_data = filter_data(parsed_data)
