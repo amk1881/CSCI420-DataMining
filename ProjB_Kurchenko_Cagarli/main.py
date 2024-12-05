@@ -23,18 +23,31 @@ VALID_FIX_QUALITY = {1, 2}  # Acceptable fix qualities (e.g., 1 for GPS fix, 2 f
 def parse_GPRMC(fields, parsed_line): 
     time_utc = fields[1]
     status = fields[2]
-    latitude = float(fields[3]) if fields[3] else None
+    latitude_ddmm = float(fields[3]) if fields[3] else None
     lat_dir = fields[4]
-    longitude = float(fields[5]) if fields[5] else None
+    longitude_ddmm = float(fields[5]) if fields[5] else None
     long_dir = fields[6]
     speed = float(fields[7]) * 0.514444  # Convert knots to m/s
     heading = float(fields[8]) if fields[8] else None
     date = fields[9]
 
-    if latitude and lat_dir == 'S':
-        latitude = -latitude
-    if longitude and long_dir == 'W':
-        longitude = -longitude
+    # Convert latitude to decimal degrees
+    latitude = None
+    if latitude_ddmm is not None:
+        degrees = int(latitude_ddmm // 100)
+        minutes = latitude_ddmm % 100
+        latitude = degrees + (minutes / 60)
+        if lat_dir == 'S':  # South latitudes are negative
+            latitude = -latitude
+
+    # Convert longitude to decimal degrees
+    longitude = None
+    if longitude_ddmm is not None:
+        degrees = int(longitude_ddmm // 100)
+        minutes = longitude_ddmm % 100
+        longitude = degrees + (minutes / 60)
+        if long_dir == 'W':  # West longitudes are negative
+            longitude = -longitude
 
     datetime_utc = datetime.strptime(date + time_utc[:6], '%d%m%y%H%M%S')
     parsed_line["datetime"] = datetime_utc
@@ -251,6 +264,8 @@ def trip_started_near_location(trip_data, target_location, radius=2):
 
 # Determines if the trip ended near a given location.
 def trip_ended_near_location(trip_data, location_b, radius=2):
+    lat = trip_data[-1]['latitude']
+    long = trip_data[-1]['longitude']
     end_point = (trip_data[-1]['latitude'], trip_data[-1]['longitude'])
     return is_near_location(end_point, location_b, radius)
 
@@ -258,14 +273,15 @@ def trip_ended_near_location(trip_data, location_b, radius=2):
 
 '''
 RIT :  *Make GPS fence for this much larger to compensate large area
-82 Lomb Memorial Drive, Rochester, NY 14623
+90 Lomb Memorial Drive, Rochester, NY 14623
 Henrietta New York United States
-lat : 43.086065
-long: -77.68094333
+43.084201, -77.676493
+This is the center of campus, + radius of 930km for 'nearness' or 0.93 radius
 
 Kinsman Address: 
 34 Random Knolls drive, Penfield NY 14526 - 1970 
 43.138238, -77.437821
+nearness is 0.28 radius away 
 
 '''
 
@@ -279,8 +295,8 @@ def main():
     RIT_location = (43.086065, -77.68094333)
     kinsman_res_location = (43.138238, -77.437821)
 
-    print(trip_started_near_location(trip_data, kinsman_res_location))  # True
-    print(trip_ended_near_location(trip_data, RIT_location))    # True
+    print(trip_started_near_location(trip_data, kinsman_res_location,0.28))  # True
+    print(trip_ended_near_location(trip_data, RIT_location, 0.93))    # True
 
 
     '''
