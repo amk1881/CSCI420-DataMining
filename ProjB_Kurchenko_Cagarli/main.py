@@ -295,8 +295,20 @@ def main():
     RIT_location = (43.086065, -77.68094333)
     kinsman_res_location = (43.138238, -77.437821)
 
-    print(trip_started_near_location(trip_data, kinsman_res_location,0.28))  # True
-    print(trip_ended_near_location(trip_data, RIT_location, 0.93))    # True
+    trip_start_near_drk = lambda: "Yes" if trip_started_near_location(trip_data, kinsman_res_location, 0.28) else "No"    
+    print(f"Did the trip start near Dr. K's house? {trip_start_near_drk()}")
+    
+    trip_end_near_rit = lambda: "Yes" if trip_ended_near_location(trip_data, RIT_location, 0.93) else "No"
+    print(f"Did the trip go to RIT? {trip_end_near_rit()}")
+    
+    #tighter bound for 'start AT' location
+    trip_start_at_rit = lambda: "Yes" if trip_started_near_location(trip_data, RIT_location, 0.8) else "No"    
+    print(f"Did the trip originate at RIT? {trip_start_at_rit()}")
+
+    #tighter bound for 'start AT' location, within 30m 
+    trip_end_near_drk = lambda: "Yes" if trip_ended_near_location(trip_data, kinsman_res_location, 0.03) else "No"
+    print(f"Did the trip go to Dr. K's House? {trip_end_near_drk()}")
+    
 
 
     '''
