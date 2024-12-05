@@ -20,7 +20,7 @@ VALID_FIX_QUALITY = {1, 2}  # Acceptable fix qualities (e.g., 1 for GPS fix, 2 f
 
 
 # parse all fields from GRMPC line 
-def parse_GRMPC(fields, parsed_line): 
+def parse_GPRMC(fields, parsed_line): 
     time_utc = fields[1]
     status = fields[2]
     latitude = float(fields[3]) if fields[3] else None
@@ -61,6 +61,7 @@ def parse_GPGGA(fields, parsed_line):
  Clean and parse a GPS data line and extract relevant fields.
  Returns list of all parsed lines 
    Each line captured by a dict of all its fields 
+
 '''
 def parsed_gps_lines(filename):
     with open(filename, 'r') as file:
@@ -72,31 +73,78 @@ def parsed_gps_lines(filename):
 
             if line1.startswith('$GPRMC'):
                 line2 = file.readline().strip()
-                #print("line1 is :" , line1, "\nline2 is :" , line2)
-                fields = line1.split(',')
-                parsed_line = parse_GRMPC(fields, parsed_line)
+                #print("line1 is :" , line1, "line2 is :" , line2, "\n")
 
-                
-                #This happens if arduino eats a nl 
-                if '$GPGGA' in line1:
+                # correct case 
+                if not '$GPGGA' in line1:
+                    fields = line1.split(',')        
+                    parsed_line = parse_GPRMC(fields, parsed_line)
+
+                    if line2.startswith('$GPGGA'):
+                        # correct case 
+                        if not '$GPRMC' in line2:
+                            fields = line2.split(',')        
+                            parsed_line = parse_GPGGA(fields, parsed_line)
+
+                        # This happens if arduino eats a nl 
+                        elif '$GPRMC' in line2 or 'lng' in line2:
+                            fields = line2.split('$')[1].split(',')        #After 1st $ before lng
+                            parsed_line = parse_GPGGA(fields, parsed_line)
+                            #do not use lng or next line's GRMPC if present
+                    else : 
+                        # Means we have no altitude, skip this data point 
+                        parsed_line = {}
+
+                # This happens if arduino eats a nl 
+                elif '$GPGGA' in line1:
+                    fields = line1.split('$')[1].split(',')        #After 1st $
+                    parsed_line = parse_GPRMC(fields, parsed_line)
+
+                    fields = line1.split('$')[2].split(',')        #After 2nd $ 
+                    parsed_line = parse_GPGGA(fields, parsed_line)
+                    #After this jumps to next final condition
+            
+
+            # pretty sure we only care about the altitude here
+            elif line1.startswith('$GPGGA'):
+                line2 = file.readline().strip()
+                #print("line1 is :" , line1, "line2 is :" , line2, "\n")
+
+                # correct case 
+                if not '$GPRMC' in line1:
+                    fields = line1.split(',')        
                     parsed_line = parse_GPGGA(fields, parsed_line)
 
+                    if line2.startswith('$GPRMC'):
+                        # correct case 
+                        if not '$GPGGA' in line2:
+                            fields = line2.split(',')        
+                            parsed_line = parse_GPRMC(fields, parsed_line)
 
-                # pretty sure we only care about the altitude here
-                elif line2.startswith('$GPGGA'):
-                    fields = line2.split(',')
+                        # This happens if arduino eats a nl 
+                        elif ('$GPGGA' in line2) or ('lng' in line2):
+                            fields = line2.split('$')[1].split(',')        #After 1st $ before lng
+                            parsed_line = parse_GPRMC(fields, parsed_line)
+                            #do not use lng or next line's GRMPC if present
+                        
+                    else : 
+                        # Means we have no GRMPC data, skip this datapoint 
+                        parsed_line = {}
+
+                # This happens if arduino eats a nl 
+                elif '$GPRMC' in line1:
+                    fields = line1.split('$')[1].split(',')        #After 1st $
                     parsed_line = parse_GPGGA(fields, parsed_line)
-                    
-                else: 
-                    parsed_line["altitude"] = None 
-                    parsed_line["fix_quality"] = None 
+
+                    fields = line1.split('$')[2].split(',')        #After 2nd $ 
+                    parsed_line = parse_GPRMC(fields, parsed_line)
+                    #After this jumps to next final condition
             
-            # Capture lines that are missing GRMPC data, only have unpaired GPGGA data as NONE, 
-            # since there is not enough info to only use GPGGA, this is assuming that lng will also not be recorded 
-            elif line1.startswith('GPGGA'): 
-                parsed_line["datetime"] = None
-            
-            
+
+            #If no GRMPC/GPGGA line skip this data 
+            else: 
+                parsed_line = {}
+
             # skip empty lines 
             if len(parsed_line) > 0: 
                 final_data.append(parsed_line)
@@ -169,18 +217,17 @@ def trip_date_occurance(parsed_data):
 
 from math import radians, sin, cos, sqrt, atan2
 
-def is_near_location(coord, target, radius=0.5):
-    """
-    Checks if a coordinate is within a given radius of a target location.
+"""
+Checks if a coordinate is within a given radius of a target location.
     
-    Parameters:
-        coord (tuple): Tuple of (latitude, longitude) for the trip point.
-        target (tuple): Tuple of (latitude, longitude) for the target location.
-        radius (float): Distance in kilometers to consider 'near'. Default is 0.5 km.
-        
-    Returns:
-        bool: True if the coordinate is within the radius of the target location.
-    """
+Parameters:
+    coord (tuple): Tuple of (latitude, longitude) for the trip point.
+    target (tuple): Tuple of (latitude, longitude) for the target location.
+    radius (float): Distance in kilometers to consider 'near'. Default is 0.5 km.
+
+"""
+
+def is_near_location(coord, target, radius=0.5):
     # Haversine formula
     R = 6371.0  # Earth's radius in kilometers
     lat1, lon1 = radians(coord[0]), radians(coord[1])
@@ -194,38 +241,31 @@ def is_near_location(coord, target, radius=0.5):
 
     return distance <= radius
 
-def trip_started_near_location(trip_data, location_a, radius=0.5):
-    """
-    Determines if the trip started near a given location.
-    
-    Parameters:
-        trip_data (list): List of dictionaries containing parsed GPS data.
-        location_a (tuple): Tuple of (latitude, longitude) for location A.
-        radius (float): Distance in kilometers to consider 'near'. Default is 0.5 km.
-        
-    Returns:
-        bool: True if the trip started near location A.
-    """
-    if not trip_data:
-        return False
+
+"""
+Determines if the trip started near a given location.
+
+Parameters:
+    trip_data (list): List of dictionaries containing parsed GPS data.
+    location_a (tuple): Tuple of (latitude, longitude) for location A.
+    radius (float): Distance in kilometers to consider 'near'. Default is 0.5 km.
+
+"""
+def trip_started_near_location(trip_data, target_location, radius=0.5):
     start_point = (trip_data[0]['latitude'], trip_data[0]['longitude'])
-    return is_near_location(start_point, location_a, radius)
+    return is_near_location(start_point, target_location, radius)
 
 
+"""
+Determines if the trip ended near a given location.
+
+Parameters:
+    trip_data (list): List of dictionaries containing parsed GPS data.
+    location_b (tuple): Tuple of (latitude, longitude) for location B.
+    radius (float): Distance in kilometers to consider 'near'. Default is 0.5 km.
+
+"""
 def trip_ended_near_location(trip_data, location_b, radius=0.5):
-    """
-    Determines if the trip ended near a given location.
-    
-    Parameters:
-        trip_data (list): List of dictionaries containing parsed GPS data.
-        location_b (tuple): Tuple of (latitude, longitude) for location B.
-        radius (float): Distance in kilometers to consider 'near'. Default is 0.5 km.
-        
-    Returns:
-        bool: True if the trip ended near location B.
-    """
-    if not trip_data:
-        return False
     end_point = (trip_data[-1]['latitude'], trip_data[-1]['longitude'])
     return is_near_location(end_point, location_b, radius)
 
@@ -240,10 +280,8 @@ long: -77.68094333
 
 
 Kinsman Address: 
-1182 Whalen Road, Penfield, NY 14526
-Penfield New York United States
-lat: 43.14122833
-long: -77.44047
+34 Random Knolls drive, Penfield NY 14526 - 1970 
+43.138238, -77.437821
 
 '''
 
@@ -251,16 +289,15 @@ long: -77.44047
 def main():
 
     filename = sys.argv[1]
-    parsed_data = parsed_gps_lines(filename)
-    print(parsed_data)
+    trip_data = parsed_gps_lines(filename)
 
-    trip_date_occurance(parsed_data)
+    trip_date_occurance(trip_data)
 
     RIT_location = (43.086065, -77.68094333)
-    Kinsman_res_location = (43.14122833, -77.44047)
+    kinsman_res_location = (43.138238, -77.437821)
 
-    print(trip_started_near_location(trip_data, location_a))  # True
-    print(trip_ended_near_location(trip_data, location_b))    # True
+    print(trip_started_near_location(trip_data, kinsman_res_location))  # True
+    print(trip_ended_near_location(trip_data, RIT_location))    # True
 
 
     '''
