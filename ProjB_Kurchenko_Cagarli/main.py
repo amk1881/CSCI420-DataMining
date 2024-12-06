@@ -216,7 +216,6 @@ def is_near_location(coord, target, radius=0.5):
     return distance <= radius
 
 
-
 # Determines if the trip started near a given location.
 def trip_started_near_location(trip_data, target_location, radius=2):
     start_point = (trip_data[0]['latitude'], trip_data[0]['longitude'])
@@ -231,9 +230,14 @@ def trip_ended_near_location(trip_data, location_b, radius=2):
 
 
 """
-Check if the trip is a full trip:
-- The GPS device must have a location lock before the trip started and after the trip ended.
+Check if the trip is considered a full trip.
+To be a full trip:
+- The GPS device must have a location lock ("A") before the trip
+  started and after the trip ended.
 - No sudden jumps in location greater than a threshold.
+
+Returns:
+- True if valid, False if invalid
 """
 def check_if_full_trip(trip_data):
     # get the start and last data points 
@@ -299,11 +303,16 @@ def compute_trip_duration(trip_data):
     duration = end_time - start_time
     return duration
 
+"""
+Computes the total amount of stops that occur during the trip
+based on how long the device is stationary and or 
+moving less than 5 mph
 
-# Computes total stops
-# defines a stop as below 5mph and within [30 sec, 5 min], if longer => new trip 
+Returns:
+- total_stops (int): Total stops during the trip.
+"""
 def how_many_stops(trip_data):       
-    stops = 0
+    total_stops = 0
     stop_start_time = None
 
     for i in range(1, len(trip_data)):
@@ -329,7 +338,7 @@ def how_many_stops(trip_data):
                 # reset stop tracker
                 stop_start_time = None
 
-    return stops
+    return total_stops
 
 '''
 Computes the fraction of the trip spent going uphill (angle > 15 degrees).
@@ -458,7 +467,12 @@ def compute_hill_climbs(trip_data, flat_threshold=50):
 
     return round(total_climb,1), hills
 
+"""
+Computes the amount of brake 'slams' that occur during the trip.
 
+Returns:
+- brake_count (int): Total amount of brake 'slams'.
+"""
 def check_brake_rate(trip_data):
     brake_counter = 0
     total_deceleration = 0.0
