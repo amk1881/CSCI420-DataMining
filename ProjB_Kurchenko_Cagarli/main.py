@@ -508,29 +508,16 @@ def check_brake_rate(trip_data):
                         
     return brake_counter
 
-    
-'''
-RIT :  *Make GPS fence for this much larger to compensate large area
-90 Lomb Memorial Drive, Rochester, NY 14623
-Henrietta New York United States
-43.084201, -77.676493
-This is the center of campus, + radius of 930km for 'nearness' or 0.93 radius
-
-Kinsman Address: 
-34 Random Knolls drive, Penfield NY 14526 - 1970 
-43.138238, -77.437821
-nearness is 0.28 radius away 
-
-'''
 
 # Main subroutine navigating all questions 
 # Full analyzes a given GPS trip 
 def main():
     filename = sys.argv[1]
     trip_data = parsed_gps_lines(filename)
-    
+    #Q1-2 
     trip_date_occurance(trip_data)
 
+    #Q3-6 
     RIT_location = (43.086065, -77.68094333)
     kinsman_res_location = (43.138238, -77.437821)
 
@@ -548,23 +535,25 @@ def main():
     trip_end_near_drk = lambda: "Yes" if trip_ended_near_location(trip_data, kinsman_res_location, 0.03) else "No"
     print(f"Did the trip go to Dr. K's House? {trip_end_near_drk()}")
     
+
+    # Q7
     was_full_trip = lambda: "Yes" if check_if_full_trip(trip_data) else "No"
     print(f"Was the trip a full trip? {was_full_trip()}")
-    
-    stops = how_many_stops(trip_data)
-    print("Number of complete stops: ", stops)
-    
+   
+    # Q8
     duration = compute_trip_duration(trip_data)
     print("Trip Duration: ", duration)
+    
+    # Q9
+    stops = how_many_stops(trip_data)
+    print("Number of complete stops: ", stops)
 
-    for trip in trip_data: 
-        if trip["altitude"] is None: 
-            print(trip) 
-
+    # Q10-11
     uphill_percent, uphill_duration = compute_uphill_duration(duration, trip_data)
     print(f"Percent of time spent traveling uphill: {uphill_percent}")
     print(f"Time spent traveling uphill: {uphill_duration}")
     
+    # Q12
     total_climb, hills = compute_hill_climbs(trip_data)
     print(f"Total hills climbed: {len(hills)}")
     hill_count = 1
@@ -573,9 +562,9 @@ def main():
         hill_count +=1
     print(f"Total meters climbed uphill: {total_climb}")
 
-
+    # Q13
     num_of_brakes = check_brake_rate(trip_data)
-    print(f"Times 'slamming' brakes: {num_of_brakes}")
+    print(f"Times breaks were 'slammed': {num_of_brakes}")
 
 
 main()
