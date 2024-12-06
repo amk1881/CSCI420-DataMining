@@ -60,7 +60,10 @@ def parse_GPRMC(fields, parsed_line):
         if long_dir == 'W':  # West longitudes are negative
             longitude = -longitude
 
-    datetime_utc = datetime.strptime(date + time_utc[:6], '%d%m%y%H%M%S')
+    try: # catch faulty dates and skip
+        datetime_utc = datetime.strptime(date + time_utc[:6], '%d%m%y%H%M%S')
+    except: return {}
+
     parsed_line["datetime"] = datetime_utc
     parsed_line["status"] = status
     parsed_line["latitude"] = latitude
@@ -94,11 +97,13 @@ def parsed_gps_lines(filename):
         final_data = []
 
         for line1 in file:
+            print(line1)
             line1.strip()
             parsed_line  = {}
 
             if line1.startswith('$GPRMC'):
                 line2 = file.readline().strip()
+                print(line2)
                 #print("line1 is :" , line1, "line2 is :" , line2, "\n")
 
                 # correct case 
@@ -173,9 +178,8 @@ def parsed_gps_lines(filename):
                 parsed_line = {}
 
             # skip empty lines 
-            if len(parsed_line) > 0: 
+            if len(parsed_line) > 0 and 'status' in parsed_line: 
                 final_data.append(parsed_line)
-
         
         return final_data
             
