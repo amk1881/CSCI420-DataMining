@@ -13,11 +13,14 @@ from geopy.distance import geodesic
 # site to auto-parse gps data for checking: https://swairlearn.bluecover.pt/nmea_analyser
 
 # Constants
-MIN_SPEED_THRESHOLD = 0.5       # Minimum speed in m/s for valid data
-MAX_POINTS_PER_PATH = 20000     # Maximum number of points in one path
-JUMP_THRESHOLD = 35            # Threshold for a "sudden jump" (in meters)
-DATA_START_REGEX = r'^\$GPRMC'  # Data starts with this regex
-VALID_FIX_QUALITY = {1, 2}      # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
+MIN_SPEED_THRESHOLD = 0.5                   # Minimum speed in m/s for valid data
+MAX_POINTS_PER_PATH = 20000                 # Maximum number of points in one path
+MIN_STOP_DURATION = timedelta(seconds=30)   # Minimum time stationary to be considered a stop
+MAX_STOP_DURATION = timedelta(minutes=5)    # Maximum time stationary to be considered a stop
+JUMP_THRESHOLD = 35                         # Threshold for a "sudden jump" (in meters)
+STOP_SPEED = 5.0 * 0.44704                  # Maximum speed to be considered a stop (5 mph converted to m/s)
+DATA_START_REGEX = r'^\$GPRMC'              # Data starts with this regex
+VALID_FIX_QUALITY = {1, 2}                  # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
 
 
 # parse all fields from GRMPC line 
@@ -295,6 +298,36 @@ def compute_trip_duration(trip_data):
     duration = end_time - start_time
     return duration
 
+
+def how_many_stops(trip_data):       
+    stops = 0
+    stop_start_time = None
+
+    for i in range(1, len(trip_data)):
+        
+        current_point = trip_data[i]
+
+        # if the speed is below 5 mph, potentially stop
+        if current_point["speed"] <= STOP_SPEED:
+            
+            if stop_start_time is None:
+                # get the start of a potential stop
+                stop_start_time = current_point["datetime"]
+                
+        else:
+            # if the vehicle is moving, check if we were stopped
+            if stop_start_time is not None:
+                # find the duration of the stop
+                stop_duration = current_point["datetime"] - stop_start_time
+                
+                if MIN_STOP_DURATION <= stop_duration <= MAX_STOP_DURATION:
+                    stops += 1
+                    
+                # reset stop tracker
+                stop_start_time = None
+
+    return stops
+
 '''
 On a scale of 0 to 100%, what fraction of the time did the car spend going uphill?  
 Uphill is defined as going up by more than a 15 degree angle.  You have to do some 
@@ -344,6 +377,9 @@ def main():
     print(f"Did the trip go to Dr. K's House? {trip_end_near_drk()}")
     
     check_if_full_trip(trip_data)
+    
+    stops = how_many_stops(trip_data)
+    print("Number of stops: ", stops)
     
     duration = compute_trip_duration(trip_data)
     print("Trip Duration: ", duration)
