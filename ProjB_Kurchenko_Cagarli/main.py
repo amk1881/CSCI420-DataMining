@@ -13,10 +13,11 @@ from geopy.distance import geodesic
 # site to auto-parse gps data for checking: https://swairlearn.bluecover.pt/nmea_analyser
 
 # Constants
-MIN_SPEED_THRESHOLD = 0.5  # Minimum speed in m/s for valid data
-MAX_POINTS_PER_PATH = 20000  # Maximum number of points in one path
+MIN_SPEED_THRESHOLD = 0.5       # Minimum speed in m/s for valid data
+MAX_POINTS_PER_PATH = 20000     # Maximum number of points in one path
+JUMP_THRESHOLD = 100            # Threshold for a "sudden jump" (in meters)
 DATA_START_REGEX = r'^\$GPRMC'  # Data starts with this regex
-VALID_FIX_QUALITY = {1, 2}  # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
+VALID_FIX_QUALITY = {1, 2}      # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
 
 
 # parse all fields from GRMPC line 
@@ -51,6 +52,7 @@ def parse_GPRMC(fields, parsed_line):
 
     datetime_utc = datetime.strptime(date + time_utc[:6], '%d%m%y%H%M%S')
     parsed_line["datetime"] = datetime_utc
+    parsed_line["status"] = status
     parsed_line["latitude"] = latitude
     parsed_line["longitude"] = longitude
     parsed_line["lat_dir"] = lat_dir
@@ -270,7 +272,75 @@ def trip_ended_near_location(trip_data, location_b, radius=2):
     return is_near_location(end_point, location_b, radius)
 
 
+def check_if_full_trip(trip_data):
+    """
+    Check if the trip is a full trip:
+    - The GPS device must have a location lock before the trip started and after the trip ended.
+    - No sudden jumps in location greater than a threshold.
+    """
+    
+    # get the start and last data points 
+    start_point = trip_data[0]
+    end_point = trip_data[-1]
 
+    # check if GPS location lock exists
+    if start_point["status"] != "A" or end_point["status"] != "A":
+        print('No,')  
+        return
+
+    # calculate distances between consecutive points and check for sudden jumps
+    for i in range(1, len(trip_data)):
+        current_point = trip_data[i]
+        previous_point = trip_data[i - 1]
+
+        # calculate distance between consecutive points
+        distance = geodesic(
+            (previous_point["latitude"], previous_point["longitude"]),
+            (current_point["latitude"], current_point["longitude"])
+        ).meters
+
+        # check if there was a sudden jump
+        if distance > JUMP_THRESHOLD:
+            print('No,') 
+            return
+
+    # if no issues were found, the trip is valid
+    print('Yes,')
+
+
+def compute_trip_duration(trip_data):
+
+    # find the first point where the device starts moving
+    start_index = None
+    for i, point in enumerate(trip_data):
+        if point["speed"] >= MIN_SPEED_THRESHOLD:
+            start_index = i
+            break
+
+    # check if valid starting point
+    if start_index is None:
+        # device was stationary the entire time on
+        return None 
+
+    # find the last point where the device is moving before stopping at destination
+    end_index = None
+    for i in range(len(trip_data) - 1, -1, -1):
+        if trip_data[i]["speed"] >= MIN_SPEED_THRESHOLD:
+            end_index = i
+            break
+
+    # check if valid ending point
+    if end_index is None:
+        # device stopped recording before arriving at destination
+        return None  
+
+    # calculate the trip duration (start to end, excluding stationary periods)
+    start_time = trip_data[start_index]["datetime"]
+    end_time = trip_data[end_index]["datetime"]
+
+    duration = end_time - start_time
+    return duration
+    
 '''
 RIT :  *Make GPS fence for this much larger to compensate large area
 90 Lomb Memorial Drive, Rochester, NY 14623
@@ -289,7 +359,7 @@ nearness is 0.28 radius away
 def main():
     filename = sys.argv[1]
     trip_data = parsed_gps_lines(filename)
-
+    
     trip_date_occurance(trip_data)
 
     RIT_location = (43.086065, -77.68094333)
@@ -309,7 +379,11 @@ def main():
     trip_end_near_drk = lambda: "Yes" if trip_ended_near_location(trip_data, kinsman_res_location, 0.03) else "No"
     print(f"Did the trip go to Dr. K's House? {trip_end_near_drk()}")
     
-
+    check_if_full_trip(trip_data)
+    
+    duration = compute_trip_duration(trip_data)
+    print("Trip Duration: ", duration)
+    
 
     '''
     filtered_data = filter_data(parsed_data)
