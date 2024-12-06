@@ -9,6 +9,8 @@ import re
 import sys
 from datetime import datetime, timedelta
 from geopy.distance import geodesic
+from math import radians, sin, cos, sqrt, atan2
+from math import atan, degrees, sqrt
 
 # site to auto-parse gps data for checking: https://swairlearn.bluecover.pt/nmea_analyser
 
@@ -21,7 +23,8 @@ JUMP_THRESHOLD = 35                         # Threshold for a "sudden jump" (in 
 STOP_SPEED = 5.0 * 0.44704                  # Maximum speed to be considered a stop (5 mph converted to m/s)
 DATA_START_REGEX = r'^\$GPRMC'              # Data starts with this regex
 VALID_FIX_QUALITY = {1, 2}                  # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
-
+EARTH_RADIUS_M = 6371000                    # Earth's radius in meters
+EARTH_RADIUS_KM = 6371.0                      # Earth's radius in kilometers
 
 # parse all fields from GRMPC line 
 def parse_GPRMC(fields, parsed_line): 
@@ -187,9 +190,6 @@ def trip_date_occurance(parsed_data):
 
 
 
-
-from math import radians, sin, cos, sqrt, atan2
-
 """
 Checks if a coordinate is within a given radius of a target location.
     
@@ -202,7 +202,7 @@ Parameters:
 
 def is_near_location(coord, target, radius=0.5):
     # Haversine formula
-    R = 6371.0  # Earth's radius in kilometers
+    EARTH_RADIUS_KM = 6371.0  
     lat1, lon1 = radians(coord[0]), radians(coord[1])
     lat2, lon2 = radians(target[0]), radians(target[1])
     dlat = lat2 - lat1
@@ -210,7 +210,7 @@ def is_near_location(coord, target, radius=0.5):
 
     a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
-    distance = R * c
+    distance = EARTH_RADIUS_KM * c
 
     return distance <= radius
 
@@ -243,7 +243,7 @@ def check_if_full_trip(trip_data):
     # check if GPS location lock exists
     if start_point["status"] != "A" or end_point["status"] != "A":
         print('No,')  
-        return
+        return False
 
     # calculate distances between consecutive points and check for sudden jumps
     for i in range(1, len(trip_data)):
@@ -259,10 +259,10 @@ def check_if_full_trip(trip_data):
         # check if there was a sudden jump
         if distance > JUMP_THRESHOLD:
             print('No,') 
-            return
+            return False
 
     # if no issues were found, the trip is valid
-    print('Yes it was a full trip,')
+    return True
 
 
 def compute_trip_duration(trip_data):
@@ -329,12 +329,66 @@ def how_many_stops(trip_data):
     return stops
 
 '''
+Computes the fraction of the trip spent going uphill (angle > 15 degrees).
+Answers: 
 On a scale of 0 to 100%, what fraction of the time did the car spend going uphill?  
-Uphill is defined as going up by more than a 15 degree angle.  You have to do some 
-math to figure this out.'''
-def compute_uphill_duration(): 
-    
-    pass
+'''
+def compute_uphill_duration(total_time, trip_data ): 
+    if total_time.total_seconds() == 0:
+        return 0.0  # Avoid division by zero for empty trips.
+
+    uphill_time = 0  
+    prev_point = None
+
+    for point in trip_data:
+        if not prev_point:
+            prev_point = point
+            continue
+
+        # Calculate the changes in altitude and distance
+        altitude_change = point['altitude'] - prev_point['altitude']
+        lat1, long1 = prev_point['latitude'], prev_point['longitude']
+        lat2, long2 = point['latitude'], point['longitude']
+        
+        # Compute horizontal distance between consecutive points using haversine formula
+        horizontal_distance = haversine(lat1, long1, lat2, long2)  
+        
+        if horizontal_distance > 0:  # Avoid division by zero
+            angle = degrees(atan(altitude_change / horizontal_distance))
+            if angle > 15:
+                # Compute time spent between these two points
+                time_difference = (point['datetime'] - prev_point['datetime']).total_seconds()
+                uphill_time += time_difference
+
+        prev_point = point
+
+    # Calculate percentage of time spent going uphill
+    uphill_fraction = (uphill_time / total_time.total_seconds()) * 100
+    return round(uphill_fraction, 1)
+
+
+"""
+Calculates distance between two points on the Earth's surface.
+Parameters:
+    lat1, lon1: Latitude and longitude of the first point in decimal degrees.
+    lat2, lon2: Latitude and longitude of the second point in decimal degrees.
+
+"""
+def haversine(lat1, lon1, lat2, lon2):
+
+    from math import radians, sin, cos, sqrt, atan2
+    EARTH_RADIUS_M = 6371000  
+
+    # Convert coordinates from degrees to radians
+    phi1, phi2 = radians(lat1), radians(lat2)
+    delta_phi = radians(lat2 - lat1)
+    delta_lambda = radians(lon2 - lon1)
+
+    # Haversine formula
+    a = sin(delta_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(delta_lambda / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    return EARTH_RADIUS_M * c
 
 
     
@@ -376,7 +430,8 @@ def main():
     trip_end_near_drk = lambda: "Yes" if trip_ended_near_location(trip_data, kinsman_res_location, 0.03) else "No"
     print(f"Did the trip go to Dr. K's House? {trip_end_near_drk()}")
     
-    check_if_full_trip(trip_data)
+    was_full_trip = lambda: "Yes" if check_if_full_trip(trip_data) else "No"
+    print(f"Was the trip a full trip? {was_full_trip()}")
     
     stops = how_many_stops(trip_data)
     print("Number of stops: ", stops)
@@ -384,7 +439,8 @@ def main():
     duration = compute_trip_duration(trip_data)
     print("Trip Duration: ", duration)
 
-    compute_uphill_duration(duration)
+    uphill_duration = compute_uphill_duration(duration, trip_data)
+    print(f"Time spent traveling uphill: {uphill_duration}")
 
 
 #if __name__ == "__main__":
