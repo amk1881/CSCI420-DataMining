@@ -26,6 +26,8 @@ VALID_FIX_QUALITY = {1, 2}                  # Acceptable fix qualities (e.g., 1 
 EARTH_RADIUS_M = 6371000                    # Earth's radius in meters
 EARTH_RADIUS_KM = 6371.0                      # Earth's radius in kilometers
 
+
+
 # parse all fields from GRMPC line 
 def parse_GPRMC(fields, parsed_line): 
     time_utc = fields[1]
@@ -79,10 +81,9 @@ def parse_GPGGA(fields, parsed_line):
     return parsed_line
 
 '''
- Clean and parse a GPS data line and extract relevant fields.
+ Clean and parses a GPS data line and extract relevant fields.
  Returns list of all parsed lines 
    Each line captured by a dict of all its fields 
-
 '''
 def parsed_gps_lines(filename):
     with open(filename, 'r') as file:
@@ -174,13 +175,7 @@ def parsed_gps_lines(filename):
         return final_data
             
 
-'''
-What day did the trip occur.  Report this as YYYY/MM/DD, 
-For example, 2024/09/23 for Sept 23rd. (5) 
-2. What time of day did the trip start. 
-Use UTC for this.  That’s fine.   
-Report this as HH:MM, with HH as a 24-hour clock
-'''
+# Reports date and time that trip occured in YYYY/MM/DD and UTC format
 def trip_date_occurance(parsed_data):
     date  = parsed_data[0]["datetime"].date().strftime('%Y/%m/%d')
     print(f"GPS Trip Occured on: {date}")
@@ -189,17 +184,13 @@ def trip_date_occurance(parsed_data):
     print(f"Trip started at time : {time}")
 
 
-
 """
 Checks if a coordinate is within a given radius of a target location.
-    
 Parameters:
     coord (tuple): Tuple of (latitude, longitude) for the trip point.
     target (tuple): Tuple of (latitude, longitude) for the target location.
     radius (float): Distance in kilometers to consider 'near'. Default is 0.5 km.
-
 """
-
 def is_near_location(coord, target, radius=0.5):
     # Haversine formula
     EARTH_RADIUS_KM = 6371.0  
@@ -229,13 +220,12 @@ def trip_ended_near_location(trip_data, location_b, radius=2):
     return is_near_location(end_point, location_b, radius)
 
 
+"""
+Check if the trip is a full trip:
+- The GPS device must have a location lock before the trip started and after the trip ended.
+- No sudden jumps in location greater than a threshold.
+"""
 def check_if_full_trip(trip_data):
-    """
-    Check if the trip is a full trip:
-    - The GPS device must have a location lock before the trip started and after the trip ended.
-    - No sudden jumps in location greater than a threshold.
-    """
-    
     # get the start and last data points 
     start_point = trip_data[0]
     end_point = trip_data[-1]
@@ -265,8 +255,9 @@ def check_if_full_trip(trip_data):
     return True
 
 
+# Computes total time between first and last points 
+# returns a timedelta 
 def compute_trip_duration(trip_data):
-
     # find the first point where the device starts moving
     start_index = None
     for i, point in enumerate(trip_data):
@@ -299,6 +290,8 @@ def compute_trip_duration(trip_data):
     return duration
 
 
+# Computes total stops
+# defines a stop as below 5mph and within [30 sec, 5 min], if longer => new trip 
 def how_many_stops(trip_data):       
     stops = 0
     stop_start_time = None
@@ -377,7 +370,6 @@ Calculates distance between two points on the Earth's surface.
 Parameters:
     lat1, lon1: Latitude and longitude of the first point in decimal degrees.
     lat2, lon2: Latitude and longitude of the second point in decimal degrees.
-
 """
 def haversine(lat1, lon1, lat2, lon2):
 
@@ -395,54 +387,6 @@ def haversine(lat1, lon1, lat2, lon2):
 
     return EARTH_RADIUS_M * c
 
-def check_brake_rate(trip_data):
-    brake_counter = 0
-    total_deceleration = 0.0
-    threshold = 0.09 # Threshold in m/s²
-    
-    for i in range(1, len(trip_data)):
-        current_point = trip_data[i]
-        previous_point = trip_data[i - 1]
-        
-        # skip if speed is 0
-        if current_point["speed"] == 0 or previous_point["speed"] == 0:
-            continue
-        
-        # convert speed from knots to meters per second
-        current_speed_mps = current_point["speed"] * 0.514444
-        previous_speed_mps = previous_point["speed"] * 0.514444
-        
-        # Check if we're decelerating (current speed is less than previous speed)
-        if current_speed_mps < previous_speed_mps:
-            time_diff = (current_point["datetime"] - previous_point["datetime"]).total_seconds()
-            speed_diff = previous_speed_mps - current_speed_mps
-            
-            # Compute speed/time ratio (deceleration in m/s²)
-            if time_diff > 0:  # Avoid division by zero
-                deceleration = speed_diff / time_diff
-                
-                # Add to total deceleration
-                total_deceleration += deceleration
-                
-                # Check if the next point is also decelerating
-                if i + 1 < len(trip_data):
-                    next_point = trip_data[i + 1]
-                    next_speed_mps = next_point["speed"] * 0.514444
-                    
-                    if next_speed_mps < current_speed_mps:
-                        # Continue the deceleration sequence
-                        continue
-                    else:
-                        # Acceleration detected, stop the deceleration sequence
-                        if deceleration > threshold:
-                            brake_counter += 1
-                        total_deceleration = 0.0  # Reset the deceleration total after the event
-                else:
-                    # Check if the last point also exceeds the threshold
-                    if deceleration > threshold:
-                        brake_counter += 1
-                        
-    return brake_counter
 
 """
 Computes the total climb for each hill during a trip.
@@ -505,6 +449,55 @@ def compute_hill_climbs(trip_data, flat_threshold=50):
     return round(total_climb,1), hills
 
 
+def check_brake_rate(trip_data):
+    brake_counter = 0
+    total_deceleration = 0.0
+    threshold = 0.09 # Threshold in m/s²
+    
+    for i in range(1, len(trip_data)):
+        current_point = trip_data[i]
+        previous_point = trip_data[i - 1]
+        
+        # skip if speed is 0
+        if current_point["speed"] == 0 or previous_point["speed"] == 0:
+            continue
+        
+        # convert speed from knots to meters per second
+        current_speed_mps = current_point["speed"] * 0.514444
+        previous_speed_mps = previous_point["speed"] * 0.514444
+        
+        # Check if we're decelerating (current speed is less than previous speed)
+        if current_speed_mps < previous_speed_mps:
+            time_diff = (current_point["datetime"] - previous_point["datetime"]).total_seconds()
+            speed_diff = previous_speed_mps - current_speed_mps
+            
+            # Compute speed/time ratio (deceleration in m/s²)
+            if time_diff > 0:  # Avoid division by zero
+                deceleration = speed_diff / time_diff
+                
+                # Add to total deceleration
+                total_deceleration += deceleration
+                
+                # Check if the next point is also decelerating
+                if i + 1 < len(trip_data):
+                    next_point = trip_data[i + 1]
+                    next_speed_mps = next_point["speed"] * 0.514444
+                    
+                    if next_speed_mps < current_speed_mps:
+                        # Continue the deceleration sequence
+                        continue
+                    else:
+                        # Acceleration detected, stop the deceleration sequence
+                        if deceleration > threshold:
+                            brake_counter += 1
+                        total_deceleration = 0.0  # Reset the deceleration total after the event
+                else:
+                    # Check if the last point also exceeds the threshold
+                    if deceleration > threshold:
+                        brake_counter += 1
+                        
+    return brake_counter
+
     
 '''
 RIT :  *Make GPS fence for this much larger to compensate large area
@@ -520,7 +513,8 @@ nearness is 0.28 radius away
 
 '''
 
-# Main subroutine navigating full functionality 
+# Main subroutine navigating all questions 
+# Full analyzes a given GPS trip 
 def main():
     filename = sys.argv[1]
     trip_data = parsed_gps_lines(filename)
@@ -569,8 +563,5 @@ def main():
     num_of_brakes = check_brake_rate(trip_data)
     print(f"Times 'slamming' brakes: {num_of_brakes}")
 
-
-#if __name__ == "__main__":
-#    main()
 
 main()
