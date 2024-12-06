@@ -395,7 +395,54 @@ def haversine(lat1, lon1, lat2, lon2):
 
     return EARTH_RADIUS_M * c
 
-
+def check_brake_rate(trip_data):
+    brake_counter = 0
+    total_deceleration = 0.0
+    threshold = 0.09 # Threshold in m/s²
+    
+    for i in range(1, len(trip_data)):
+        current_point = trip_data[i]
+        previous_point = trip_data[i - 1]
+        
+        # skip if speed is 0
+        if current_point["speed"] == 0 or previous_point["speed"] == 0:
+            continue
+        
+        # convert speed from knots to meters per second
+        current_speed_mps = current_point["speed"] * 0.514444
+        previous_speed_mps = previous_point["speed"] * 0.514444
+        
+        # Check if we're decelerating (current speed is less than previous speed)
+        if current_speed_mps < previous_speed_mps:
+            time_diff = (current_point["datetime"] - previous_point["datetime"]).total_seconds()
+            speed_diff = previous_speed_mps - current_speed_mps
+            
+            # Compute speed/time ratio (deceleration in m/s²)
+            if time_diff > 0:  # Avoid division by zero
+                deceleration = speed_diff / time_diff
+                
+                # Add to total deceleration
+                total_deceleration += deceleration
+                
+                # Check if the next point is also decelerating
+                if i + 1 < len(trip_data):
+                    next_point = trip_data[i + 1]
+                    next_speed_mps = next_point["speed"] * 0.514444
+                    
+                    if next_speed_mps < current_speed_mps:
+                        # Continue the deceleration sequence
+                        continue
+                    else:
+                        # Acceleration detected, stop the deceleration sequence
+                        if deceleration > threshold:
+                            brake_counter += 1
+                        total_deceleration = 0.0  # Reset the deceleration total after the event
+                else:
+                    # Check if the last point also exceeds the threshold
+                    if deceleration > threshold:
+                        brake_counter += 1
+                        
+    return brake_counter
     
 '''
 RIT :  *Make GPS fence for this much larger to compensate large area
@@ -447,8 +494,9 @@ def main():
     uphill_percent, uphill_duration = compute_uphill_duration(duration, trip_data)
     print(f"Percent of time spent traveling uphill: {uphill_percent}")
     print(f"Time spent traveling uphill: {uphill_duration}")
-
-
+    
+    num_of_brakes = check_brake_rate(trip_data)
+    print(f"Times 'slamming' brakes: {num_of_brakes}")
 
 
 #if __name__ == "__main__":
