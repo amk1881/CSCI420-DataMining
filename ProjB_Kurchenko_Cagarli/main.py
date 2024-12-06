@@ -32,6 +32,8 @@ EARTH_RADIUS_KM = 6371.0                      # Earth's radius in kilometers
 def parse_GPRMC(fields, parsed_line): 
     time_utc = fields[1]
     status = fields[2]
+    if status == "V": #V means invalid data 
+        return {}
     latitude_ddmm = float(fields[3]) if fields[3] else None
     lat_dir = fields[4]
     longitude_ddmm = float(fields[5]) if fields[5] else None
@@ -75,6 +77,8 @@ def parse_GPRMC(fields, parsed_line):
 def parse_GPGGA(fields, parsed_line): 
     altitude = float(fields[9]) if fields[9] else None
     fix_quality = int(fields[6]) if fields[6] else None
+    if altitude is None: #faulty GPGGA line
+        return {}
 
     parsed_line["altitude"] = altitude
     parsed_line["fix_quality"] = fix_quality
@@ -171,6 +175,7 @@ def parsed_gps_lines(filename):
             # skip empty lines 
             if len(parsed_line) > 0: 
                 final_data.append(parsed_line)
+
         
         return final_data
             
@@ -546,6 +551,10 @@ def main():
     
     duration = compute_trip_duration(trip_data)
     print("Trip Duration: ", duration)
+
+    for trip in trip_data: 
+        if trip["altitude"] is None: 
+            print(trip) 
 
     uphill_percent, uphill_duration = compute_uphill_duration(duration, trip_data)
     print(f"Percent of time spent traveling uphill: {uphill_percent}")
