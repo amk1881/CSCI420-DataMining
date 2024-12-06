@@ -98,13 +98,11 @@ def parsed_gps_lines(filename):
         final_data = []
 
         for line1 in file:
-            print(line1)
             line1.strip()
             parsed_line  = {}
 
             if line1.startswith('$GPRMC'):
                 line2 = file.readline().strip()
-                print(line2)
                 #print("line1 is :" , line1, "line2 is :" , line2, "\n")
 
                 # correct case 
@@ -188,10 +186,10 @@ def parsed_gps_lines(filename):
 # Reports date and time that trip occured in YYYY/MM/DD and UTC format
 def trip_date_occurance(parsed_data):
     date  = parsed_data[0]["datetime"].date().strftime('%Y/%m/%d')
-    print(f"GPS Trip Occured on: {date}")
-
+    #print(f"GPS Trip Occured on: {date}")
     time  = parsed_data[0]["datetime"].time()
-    print(f"Trip started at time : {time}")
+    #print(f"Trip started at time : {time}")
+    return date, time
 
 
 """
@@ -262,7 +260,6 @@ def check_if_full_trip(trip_data):
 
         # check if there was a sudden jump
         if distance > JUMP_THRESHOLD:
-            print('No,') 
             return False
 
     # if no issues were found, the trip is valid
@@ -529,56 +526,82 @@ def main():
     filename = sys.argv[1]
     trip_data = parsed_gps_lines(filename)
     #Q1-2 
-    trip_date_occurance(trip_data)
+    date, time = trip_date_occurance(trip_data)
 
     #Q3-6 
     RIT_location = (43.086065, -77.68094333)
     kinsman_res_location = (43.138238, -77.437821)
 
     trip_start_near_drk = lambda: "Yes" if trip_started_near_location(trip_data, kinsman_res_location, 0.28) else "No"    
-    print(f"Did the trip start near Dr. K's house? {trip_start_near_drk()}")
+    #print(f"Did the trip start near Dr. K's house? {trip_start_near_drk()}")
     
     trip_end_near_rit = lambda: "Yes" if trip_ended_near_location(trip_data, RIT_location, 0.93) else "No"
-    print(f"Did the trip go to RIT? {trip_end_near_rit()}")
+    #print(f"Did the trip go to RIT? {trip_end_near_rit()}")
     
     #tighter bound for 'start AT' location
     trip_start_at_rit = lambda: "Yes" if trip_started_near_location(trip_data, RIT_location, 0.8) else "No"    
-    print(f"Did the trip originate at RIT? {trip_start_at_rit()}")
+    #print(f"Did the trip originate at RIT? {trip_start_at_rit()}")
 
     #tighter bound for 'start AT' location, within 30m 
     trip_end_near_drk = lambda: "Yes" if trip_ended_near_location(trip_data, kinsman_res_location, 0.03) else "No"
-    print(f"Did the trip go to Dr. K's House? {trip_end_near_drk()}")
+    #print(f"Did the trip go to Dr. K's House? {trip_end_near_drk()}")
     
 
     # Q7
     was_full_trip = lambda: "Yes" if check_if_full_trip(trip_data) else "No"
-    print(f"Was the trip a full trip? {was_full_trip()}")
+    #print(f"Was the trip a full trip? {was_full_trip()}")
    
     # Q8
     duration = compute_trip_duration(trip_data)
-    print("Trip Duration: ", duration)
+    #print("Trip Duration: ", duration)
     
     # Q9
     stops = how_many_stops(trip_data)
-    print("Number of complete stops: ", stops)
+    #print("Number of complete stops: ", stops)
 
     # Q10-11
     uphill_percent, uphill_duration = compute_uphill_duration(duration, trip_data)
-    print(f"Percent of time spent traveling uphill: {uphill_percent}")
-    print(f"Time spent traveling uphill: {uphill_duration}")
-    
+    #print(f"Percent of time spent traveling uphill: {uphill_percent}")
+    #print(f"Time spent traveling uphill: {uphill_duration}")
+
     # Q12
     total_climb, hills = compute_hill_climbs(trip_data)
-    print(f"Total hills climbed: {len(hills)}")
-    hill_count = 1
-    for hill in hills: 
-        print(f"  hill {hill_count} - climbed {hill}m")
-        hill_count +=1
-    print(f"Total meters climbed uphill: {total_climb}")
-
+    #print(f"Total hills climbed: {len(hills)}")
     # Q13
     num_of_brakes = check_brake_rate(trip_data)
-    print(f"Times breaks were 'slammed': {num_of_brakes}")
+    #print(f"Times breaks were 'slammed': {num_of_brakes}")
 
+    
+    # Q/A pretty-printing: 
+    questions_and_answers = [
+        ("GPS Trip Occured on:", date),
+        ("Trip started at time:", time),
+        ("Did the trip originiate at Dr. K's house?", trip_start_near_drk()),
+        ("Did the trip go to RIT?", trip_end_near_rit()),
+        ("Did the trip originate at RIT?", trip_start_at_rit()),
+        ("Did the trip go to Dr. K's House?", trip_end_near_drk()),
+        ("Was the trip a full trip?", was_full_trip()),
+        ("Trip Duration:", duration),
+        ("Number of complete stops:", stops),
+        ("Percent of time spent traveling uphill", uphill_percent),
+        ("Time spent traveling uphill:", uphill_duration),
+        ("Total hills climbed:", len(hills)), 
+    ]
+
+    # Print the questions and answers with proper formatting
+    for question, answer in questions_and_answers:
+        print(f"{question:<45} | {answer}")
+
+    hill_count = 1
+    for hill in hills: 
+        print(f" * hill {hill_count} - climbed {hill}m")
+        hill_count +=1
+    
+    questions_and_answers = [
+        ("Total meters climbed uphill:", total_climb),
+        ("Times breaks were 'slammed':", num_of_brakes)
+    ]
+    for question, answer in questions_and_answers:
+        print(f"{question:<45} | {answer}")
 
 main()
