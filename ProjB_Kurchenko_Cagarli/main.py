@@ -7,6 +7,9 @@ Anna Kurchenko and Lindsay Cagarli
 
 import re
 import sys
+from fastkml import kml
+from fastkml.styles import Style, LineStyle, IconStyle
+from shapely.geometry import LineString, Point
 from datetime import datetime, timedelta
 from geopy.distance import geodesic
 from math import radians, sin, cos, sqrt, atan2
@@ -26,7 +29,7 @@ DATA_START_REGEX = r'^\$GPRMC'              # Data starts with this regex
 VALID_FIX_QUALITY = {1, 2}                  # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
 EARTH_RADIUS_M = 6371000                    # Earth's radius in meters
 EARTH_RADIUS_KM = 6371.0                      # Earth's radius in kilometers
-
+KML_NAMESPACE = '{http://www.opengis.net/kml/2.2}'
 
 
 # parse all fields from GRMPC line 
@@ -519,6 +522,64 @@ def check_brake_rate(trip_data):
                         
     return brake_counter
 
+"""
+ Generates a KML file for the given GPS trip data.
+    
+Parameters:
+- trip_data: List of parsed GPS data points (dict).
+- output_filename: The filename for the generated KML file.
+"""
+def generate_kml(trip_data, output_file="output_as_kml.kml"):
+   
+    document = kml.KML()
+    kml_document = kml.Document(ns=KML_NAMESPACE)
+    document.append(kml_document)
+
+    coordinates = []
+    for point in trip_data:
+        if point.get("latitude") and point.get("longitude"):
+            # Add each point's (longitude, latitude, altitude) as a coordinate for the line
+            coordinates.append((point['longitude'], point['latitude'], point.get('altitude', 0)))
+
+    line_geometry = LineString(coordinates)
+    
+    # Make the line pretty
+    line_style = LineStyle(KML_NAMESPACE, id="lineStyleExample")
+    line_style.color = "ffff0000"
+    line_style.width = 5 
+    
+    style = Style(KML_NAMESPACE, id="Style")
+    style.append_style(line_style)
+
+    # Make Placemark and assign the geometry and style
+    placemark = kml.Placemark(ns=KML_NAMESPACE)
+    placemark.name = "GPS Trip Route"
+    placemark.geometry = line_geometry
+    placemark.styleUrl = "Style"
+
+    kml_document.append_style(style)
+    kml_document.append(placemark)
+
+    # Add Start Point
+    start_point = trip_data[0]
+    start_placemark = kml.Placemark()
+    start_placemark.name = "Start"
+    start_placemark.geometry = Point(start_point['longitude'], start_point['latitude'], start_point.get('altitude', 0))
+    
+    kml_document.append(start_placemark)
+
+    # Add End Point
+    end_point = trip_data[-1]
+    end_placemark = kml.Placemark()
+    end_placemark.name = "End"
+    end_placemark.geometry = Point(end_point['longitude'], end_point['latitude'], end_point.get('altitude', 0))
+    
+    kml_document.append(end_placemark)
+    
+    # Write to the output file
+    with open(output_file, "w") as kml_file:
+        kml_file.write(document.to_string(prettyprint=True))
+
 
 # Main subroutine navigating all questions 
 # Full analyzes a given GPS trip 
@@ -571,6 +632,7 @@ def main():
     num_of_brakes = check_brake_rate(trip_data)
     #print(f"Times breaks were 'slammed': {num_of_brakes}")
 
+    generate_kml(trip_data)
     
     # Q/A pretty-printing: 
     questions_and_answers = [
