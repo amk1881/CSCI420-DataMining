@@ -168,52 +168,6 @@ def parsed_gps_lines(filename):
         return final_data
             
 
-def filter_data(data):
-    """
-    Clean and filter the GPS data to remove redundant and erroneous points.
-    """
-    filtered_data = []
-    last_point = None
-
-    for point in data:
-        if last_point:
-            distance = geodesic((last_point[1], last_point[2]), (point[1], point[2])).meters
-            if point[3] < MIN_SPEED_THRESHOLD or distance < 1:  # Ignore stationary points
-                continue
-        filtered_data.append(point)
-        last_point = point
-
-    return filtered_data
-
-
-def compute_drive_duration(data):
-    """
-    Compute the duration of the drive from valid start to stop.
-    """
-    if len(data) < 2:
-        return None
-
-    start_point = data[0]
-    end_point = data[-1]
-
-    # Ensure the vehicle is moving at start and end
-    if start_point[3] < MIN_SPEED_THRESHOLD or end_point[3] < MIN_SPEED_THRESHOLD:
-        return None
-
-    duration = end_point[0] - start_point[0]
-    return duration
-
-
-def split_paths(data):
-    """
-    Split the data into multiple paths if exceeding maximum points limit.
-    """
-    paths = []
-    for i in range(0, len(data), MAX_POINTS_PER_PATH):
-        paths.append(data[i:i + MAX_POINTS_PER_PATH])
-    return paths
-
-
 '''
 What day did the trip occur.  Report this as YYYY/MM/DD, 
 For example, 2024/09/23 for Sept 23rd. (5) 
@@ -305,7 +259,7 @@ def check_if_full_trip(trip_data):
             return
 
     # if no issues were found, the trip is valid
-    print('Yes,')
+    print('Yes it was a full trip,')
 
 
 def compute_trip_duration(trip_data):
@@ -340,6 +294,16 @@ def compute_trip_duration(trip_data):
 
     duration = end_time - start_time
     return duration
+
+'''
+On a scale of 0 to 100%, what fraction of the time did the car spend going uphill?  
+Uphill is defined as going up by more than a 15 degree angle.  You have to do some 
+math to figure this out.'''
+def compute_uphill_duration(): 
+    
+    pass
+
+
     
 '''
 RIT :  *Make GPS fence for this much larger to compensate large area
@@ -383,21 +347,9 @@ def main():
     
     duration = compute_trip_duration(trip_data)
     print("Trip Duration: ", duration)
-    
 
-    '''
-    filtered_data = filter_data(parsed_data)
-    duration = compute_drive_duration(filtered_data)
+    compute_uphill_duration(duration)
 
-    if duration:
-        print(f"Drive Duration: {duration}")
-    else:
-        print("Invalid data: Could not compute drive duration.")
-
-    paths = split_paths(filtered_data)
-    for i, path in enumerate(paths, 1):
-        print(f"Path {i}: {len(path)} points")
-    '''
 
 #if __name__ == "__main__":
 #    main()
