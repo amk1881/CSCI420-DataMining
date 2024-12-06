@@ -395,6 +395,7 @@ def haversine(lat1, lon1, lat2, lon2):
 
     return EARTH_RADIUS_M * c
 
+<<<<<<< HEAD
 def check_brake_rate(trip_data):
     brake_counter = 0
     total_deceleration = 0.0
@@ -443,6 +444,70 @@ def check_brake_rate(trip_data):
                         brake_counter += 1
                         
     return brake_counter
+=======
+
+"""
+Computes the total climb for each hill during a trip.
+args: flat_threshold: Horizontal distance in m defining max flat section that one hill can span
+
+Returns:
+- total_climb (float): Total meters climbed during the trip.
+- hills (list): List of individual hill climbs.
+"""
+def compute_hill_climbs(trip_data, flat_threshold=50):
+    total_climb = 0
+    hills = []
+    current_hill_climb = 0
+    flat_distance_accumulated = 0  # To track flat sections
+    prev_point = None
+
+    for point in trip_data:
+        if not prev_point:
+            prev_point = point
+            continue
+
+        # Calculate changes in altitude and horizontal distance
+        altitude_change = point['altitude'] - prev_point['altitude']
+        lat1, long1 = prev_point['latitude'], prev_point['longitude']
+        lat2, long2 = point['latitude'], point['longitude']
+        horizontal_distance = haversine(lat1, long1, lat2, long2)
+
+        if altitude_change > 0:    # Continue climbing
+            current_hill_climb += altitude_change
+            flat_distance_accumulated = 0  # Reset flat section tracker
+
+
+        elif altitude_change <= 0:  # Possible end of a hill
+            if horizontal_distance > flat_threshold: #too flat for too long 
+                if current_hill_climb > 0:
+                    hills.append(round(current_hill_climb,1))
+                    total_climb += current_hill_climb
+                    current_hill_climb = 0  # Reset for next hill
+                flat_distance_accumulated = 0  # Reset tracker
+            else:
+                # Flat section, accumulate distance
+                flat_distance_accumulated += horizontal_distance
+                if flat_distance_accumulated > flat_threshold:
+                    # End the hill if the flat section becomes too long
+                    if current_hill_climb > 0:
+                        hills.append(round(current_hill_climb,1))
+                        total_climb += current_hill_climb
+                        current_hill_climb = 0  # Reset for next hill
+                    flat_distance_accumulated = 0  # Reset tracker
+                else: 
+                    current_hill_climb += altitude_change  # Continue climbing
+
+        prev_point = point
+
+    # Account for a hill still in progress at the end of the trip
+    if current_hill_climb > 0:
+        hills.append(round(current_hill_climb,1))
+        total_climb += current_hill_climb
+
+    return round(total_climb,1), hills
+
+
+>>>>>>> 81d5ed9 (Q 12 hill climbing per hill)
     
 '''
 RIT :  *Make GPS fence for this much larger to compensate large area
@@ -494,9 +559,20 @@ def main():
     uphill_percent, uphill_duration = compute_uphill_duration(duration, trip_data)
     print(f"Percent of time spent traveling uphill: {uphill_percent}")
     print(f"Time spent traveling uphill: {uphill_duration}")
+<<<<<<< HEAD
     
     num_of_brakes = check_brake_rate(trip_data)
     print(f"Times 'slamming' brakes: {num_of_brakes}")
+=======
+
+    total_climb, hills = compute_hill_climbs(trip_data)
+    print(f"Total hills climbed: {len(hills)}")
+    hill_count = 1
+    for hill in hills: 
+        print(f"  hill {hill_count} - climbed {hill}m")
+        hill_count +=1
+    print(f"Total meters climbed uphill: {total_climb}")
+>>>>>>> 81d5ed9 (Q 12 hill climbing per hill)
 
 
 #if __name__ == "__main__":
