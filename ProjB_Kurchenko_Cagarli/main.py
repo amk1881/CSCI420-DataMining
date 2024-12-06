@@ -333,7 +333,7 @@ def how_many_stops(trip_data):
                 stop_duration = current_point["datetime"] - stop_start_time
                 
                 if MIN_STOP_DURATION <= stop_duration <= MAX_STOP_DURATION:
-                    stops += 1
+                    total_stops += 1
                     
                 # reset stop tracker
                 stop_start_time = None
