@@ -330,8 +330,10 @@ def how_many_stops(trip_data):
 
 '''
 Computes the fraction of the trip spent going uphill (angle > 15 degrees).
+Computes total uphill time 
 Answers: 
 On a scale of 0 to 100%, what fraction of the time did the car spend going uphill?  
+In terms of minutes and seconds, how long did the car spend climbing hills?
 '''
 def compute_uphill_duration(total_time, trip_data ): 
     if total_time.total_seconds() == 0:
@@ -364,7 +366,10 @@ def compute_uphill_duration(total_time, trip_data ):
 
     # Calculate percentage of time spent going uphill
     uphill_fraction = (uphill_time / total_time.total_seconds()) * 100
-    return round(uphill_fraction, 1)
+
+    # HH:MM::SS format
+    uphill_duration = str(timedelta(seconds=uphill_time))
+    return round(uphill_fraction, 1), uphill_duration
 
 
 """
@@ -434,13 +439,16 @@ def main():
     print(f"Was the trip a full trip? {was_full_trip()}")
     
     stops = how_many_stops(trip_data)
-    print("Number of stops: ", stops)
+    print("Number of complete stops: ", stops)
     
     duration = compute_trip_duration(trip_data)
     print("Trip Duration: ", duration)
 
-    uphill_duration = compute_uphill_duration(duration, trip_data)
+    uphill_percent, uphill_duration = compute_uphill_duration(duration, trip_data)
+    print(f"Percent of time spent traveling uphill: {uphill_percent}")
     print(f"Time spent traveling uphill: {uphill_duration}")
+
+
 
 
 #if __name__ == "__main__":
