@@ -395,7 +395,6 @@ def haversine(lat1, lon1, lat2, lon2):
 
     return EARTH_RADIUS_M * c
 
-<<<<<<< HEAD
 def check_brake_rate(trip_data):
     brake_counter = 0
     total_deceleration = 0.0
@@ -444,7 +443,6 @@ def check_brake_rate(trip_data):
                         brake_counter += 1
                         
     return brake_counter
-=======
 
 """
 Computes the total climb for each hill during a trip.
@@ -507,7 +505,6 @@ def compute_hill_climbs(trip_data, flat_threshold=50):
     return round(total_climb,1), hills
 
 
->>>>>>> 81d5ed9 (Q 12 hill climbing per hill)
     
 '''
 RIT :  *Make GPS fence for this much larger to compensate large area
@@ -559,12 +556,7 @@ def main():
     uphill_percent, uphill_duration = compute_uphill_duration(duration, trip_data)
     print(f"Percent of time spent traveling uphill: {uphill_percent}")
     print(f"Time spent traveling uphill: {uphill_duration}")
-<<<<<<< HEAD
     
-    num_of_brakes = check_brake_rate(trip_data)
-    print(f"Times 'slamming' brakes: {num_of_brakes}")
-=======
-
     total_climb, hills = compute_hill_climbs(trip_data)
     print(f"Total hills climbed: {len(hills)}")
     hill_count = 1
@@ -572,7 +564,10 @@ def main():
         print(f"  hill {hill_count} - climbed {hill}m")
         hill_count +=1
     print(f"Total meters climbed uphill: {total_climb}")
->>>>>>> 81d5ed9 (Q 12 hill climbing per hill)
+
+
+    num_of_brakes = check_brake_rate(trip_data)
+    print(f"Times 'slamming' brakes: {num_of_brakes}")
 
 
 #if __name__ == "__main__":
