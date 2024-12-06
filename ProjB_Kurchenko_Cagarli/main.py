@@ -21,6 +21,7 @@ MIN_STOP_DURATION = timedelta(seconds=30)   # Minimum time stationary to be cons
 MAX_STOP_DURATION = timedelta(minutes=5)    # Maximum time stationary to be considered a stop
 JUMP_THRESHOLD = 35                         # Threshold for a "sudden jump" (in meters)
 STOP_SPEED = 5.0 * 0.44704                  # Maximum speed to be considered a stop (5 mph converted to m/s)
+BRAKE_THRESHOLD = 0.5                       # Threshold to determine a harder brake
 DATA_START_REGEX = r'^\$GPRMC'              # Data starts with this regex
 VALID_FIX_QUALITY = {1, 2}                  # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
 EARTH_RADIUS_M = 6371000                    # Earth's radius in meters
@@ -461,7 +462,6 @@ def compute_hill_climbs(trip_data, flat_threshold=50):
 def check_brake_rate(trip_data):
     brake_counter = 0
     total_deceleration = 0.0
-    threshold = 0.09 # Threshold in m/s²
     
     for i in range(1, len(trip_data)):
         current_point = trip_data[i]
@@ -497,12 +497,13 @@ def check_brake_rate(trip_data):
                         continue
                     else:
                         # Acceleration detected, stop the deceleration sequence
-                        if deceleration > threshold:
+                        if deceleration > BRAKE_THRESHOLD:
                             brake_counter += 1
+                            
                         total_deceleration = 0.0  # Reset the deceleration total after the event
                 else:
                     # Check if the last point also exceeds the threshold
-                    if deceleration > threshold:
+                    if deceleration > BRAKE_THRESHOLD:
                         brake_counter += 1
                         
     return brake_counter
