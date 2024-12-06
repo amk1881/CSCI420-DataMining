@@ -15,7 +15,7 @@ from geopy.distance import geodesic
 # Constants
 MIN_SPEED_THRESHOLD = 0.5       # Minimum speed in m/s for valid data
 MAX_POINTS_PER_PATH = 20000     # Maximum number of points in one path
-JUMP_THRESHOLD = 100            # Threshold for a "sudden jump" (in meters)
+JUMP_THRESHOLD = 35            # Threshold for a "sudden jump" (in meters)
 DATA_START_REGEX = r'^\$GPRMC'  # Data starts with this regex
 VALID_FIX_QUALITY = {1, 2}      # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
 
