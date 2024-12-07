@@ -31,8 +31,12 @@ EARTH_RADIUS_M = 6371000                    # Earth's radius in meters
 EARTH_RADIUS_KM = 6371.0                      # Earth's radius in kilometers
 KML_NAMESPACE = '{http://www.opengis.net/kml/2.2}'
 
-
-# parse all fields from GRMPC line 
+'''
+ Parse all fields from GRMPC line.
+ 
+ Returns:
+ - parsed_line (str)
+''' 
 def parse_GPRMC(fields, parsed_line): 
     time_utc = fields[1]
     status = fields[2]
@@ -78,9 +82,13 @@ def parse_GPRMC(fields, parsed_line):
     parsed_line["heading"] = heading
 
     return parsed_line 
-
-
-# parse all fields from GPGGA line 
+ 
+'''
+ Parse all fields from GPGGA line.
+ 
+ Returns:
+ - parsed_line (str)
+'''
 def parse_GPGGA(fields, parsed_line): 
     altitude = float(fields[9]) if fields[9] else None
     fix_quality = int(fields[6]) if fields[6] else None
@@ -93,8 +101,10 @@ def parse_GPGGA(fields, parsed_line):
 
 '''
  Clean and parses a GPS data line and extract relevant fields.
- Returns list of all parsed lines 
-   Each line captured by a dict of all its fields 
+ 
+ Returns:
+ - final_data (list): all parsed lines 
+   each line captured by a dict of all its fields 
 '''
 def parsed_gps_lines(filename):
     with open(filename, 'r') as file:
@@ -185,18 +195,21 @@ def parsed_gps_lines(filename):
         
         return final_data
             
+"""
+Reports date and time that trip occured in YYYY/MM/DD and UTC format
 
-# Reports date and time that trip occured in YYYY/MM/DD and UTC format
+Returns:
+- date
+- time 
+"""
 def trip_date_occurance(parsed_data):
     date  = parsed_data[0]["datetime"].date().strftime('%Y/%m/%d')
-    #print(f"GPS Trip Occured on: {date}")
     time  = parsed_data[0]["datetime"].time()
-    #print(f"Trip started at time : {time}")
     return date, time
-
 
 """
 Checks if a coordinate is within a given radius of a target location.
+
 Parameters:
     coord (tuple): Tuple of (latitude, longitude) for the trip point.
     target (tuple): Tuple of (latitude, longitude) for the target location.
@@ -232,6 +245,10 @@ def trip_ended_near_location(trip_data, location_b, radius=2):
 
 """
 Check if the trip is considered a full trip.
+
+Parameters:
+- trip_data: List of parsed GPS data points (dict).
+
 To be a full trip:
 - The GPS device must have a location lock ("A") before the trip
   started and after the trip ended.
@@ -241,62 +258,69 @@ Returns:
 - True if valid, False if invalid
 """
 def check_if_full_trip(trip_data):
-    # get the start and last data points 
+    # Get the start and last data points 
     start_point = trip_data[0]
     end_point = trip_data[-1]
 
-    # check if GPS location lock exists
+    # Check if GPS location lock exists
     if start_point["status"] != "A" or end_point["status"] != "A":
         print('No,')  
         return False
 
-    # calculate distances between consecutive points and check for sudden jumps
+    # Find distances between consecutive points and check for sudden jumps
     for i in range(1, len(trip_data)):
         current_point = trip_data[i]
         previous_point = trip_data[i - 1]
 
-        # calculate distance between consecutive points
+        # Find distance between consecutive points
         distance = geodesic(
             (previous_point["latitude"], previous_point["longitude"]),
             (current_point["latitude"], current_point["longitude"])
         ).meters
 
-        # check if there was a sudden jump
+        # Check if there was a sudden jump
         if distance > JUMP_THRESHOLD:
             return False
 
-    # if no issues were found, the trip is valid
+    # If no issues were found, the trip is valid
     return True
 
 
-# Computes total time between first and last points 
-# returns a timedelta 
+'''
+ Computes total time between first and last points.
+ 
+ Parameters:
+- trip_data: List of parsed GPS data points (dict).
+
+ Returns:
+ - duration (timedelta): Amount of time the trip took
+'''
 def compute_trip_duration(trip_data):
-    # find the first point where the device starts moving
+    # Find the first point where the device starts moving
     start_index = None
     for i, point in enumerate(trip_data):
         if point["speed"] >= MIN_SPEED_THRESHOLD:
             start_index = i
             break
 
-    # check if valid starting point
+    # Check if valid starting point
     if start_index is None:
-        # device was stationary the entire time on
+        # Device was stationary the entire time on
         return None 
 
-    # find the last point where the device is moving before stopping at destination
+    # Find the last point where the device is moving before stopping at destination
     end_index = None
     for i in range(len(trip_data) - 1, -1, -1):
         if trip_data[i]["speed"] >= MIN_SPEED_THRESHOLD:
             end_index = i
             break
 
-    # check if valid ending point
+    # Check if valid ending point
     if end_index is None:
-        # device stopped recording before arriving at destination
+        # Device stopped recording before arriving at destination
         return None  
 
-    # calculate the trip duration (start to end, excluding stationary periods)
+    # Find the trip duration (start to end, excluding stationary periods)
     start_time = trip_data[start_index]["datetime"]
     end_time = trip_data[end_index]["datetime"]
 
@@ -307,6 +331,9 @@ def compute_trip_duration(trip_data):
 Computes the total amount of stops that occur during the trip
 based on how long the device is stationary and or 
 moving less than 5 mph
+
+Parameters:
+- trip_data: List of parsed GPS data points (dict).
 
 Returns:
 - total_stops (int): Total stops during the trip.
@@ -319,35 +346,38 @@ def how_many_stops(trip_data):
         
         current_point = trip_data[i]
 
-        # if the speed is below 5 mph, potentially stop
+        # If the speed is below 5 mph, potentially stop
         if current_point["speed"] <= STOP_SPEED:
             
             if stop_start_time is None:
-                # get the start of a potential stop
+                # Get the start of a potential stop
                 stop_start_time = current_point["datetime"]
                 
         else:
-            # if the vehicle is moving, check if we were stopped
+            # If the vehicle is moving, check if we were stopped
             if stop_start_time is not None:
-                # find the duration of the stop
+                # Find the duration of the stop
                 stop_duration = current_point["datetime"] - stop_start_time
                 
                 if MIN_STOP_DURATION <= stop_duration <= MAX_STOP_DURATION:
                     total_stops += 1
                     
-                # reset stop tracker
+                # Reset stop tracker
                 stop_start_time = None
 
     return total_stops
 
 '''
 Computes the fraction of the trip spent going uphill (angle > 15 degrees).
-Computes total uphill time 
-Answers: 
-On a scale of 0 to 100%, what fraction of the time did the car spend going uphill?  
-In terms of minutes and seconds, how long did the car spend climbing hills?
+
+Parameters:
+- total_time: Total time of trip. 
+- trip_data: List of parsed GPS data points (dict).
+
+Returns:
+- total uphill time (int)
 '''
-def compute_uphill_duration(total_time, trip_data ): 
+def compute_uphill_duration(total_time, trip_data): 
     if total_time.total_seconds() == 0:
         return 0.0  # Avoid division by zero for empty trips.
 
@@ -386,9 +416,13 @@ def compute_uphill_duration(total_time, trip_data ):
 
 """
 Calculates distance between two points on the Earth's surface.
+
 Parameters:
-    lat1, lon1: Latitude and longitude of the first point in decimal degrees.
-    lat2, lon2: Latitude and longitude of the second point in decimal degrees.
+- lat1, lon1: Latitude and longitude of the first point in decimal degrees.
+- lat2, lon2: Latitude and longitude of the second point in decimal degrees.
+
+Returns:
+- distance found (float)
 """
 def haversine(lat1, lon1, lat2, lon2):
 
@@ -409,6 +443,10 @@ def haversine(lat1, lon1, lat2, lon2):
 
 """
 Computes the total climb for each hill during a trip.
+
+Parameters:
+- trip_data : List of parsed GPS data points (dict).
+
 args: flat_threshold: Horizontal distance in m defining max flat section that one hill can span
 
 Returns:
@@ -470,6 +508,9 @@ def compute_hill_climbs(trip_data, flat_threshold=50):
 """
 Computes the amount of brake 'slams' that occur during the trip.
 
+Parameters:
+- trip_data : List of parsed GPS data points (dict).
+
 Returns:
 - brake_count (int): Total amount of brake 'slams'.
 """
@@ -485,7 +526,7 @@ def check_brake_rate(trip_data):
         if current_point["speed"] == 0 or previous_point["speed"] == 0:
             continue
         
-        # convert speed from knots to meters per second
+        # Convert speed from knots to meters per second
         current_speed_mps = current_point["speed"] * 0.514444
         previous_speed_mps = previous_point["speed"] * 0.514444
         
@@ -538,8 +579,8 @@ def generate_kml(trip_data, output_file="output_as_kml.kml"):
     coordinates = []
     for point in trip_data:
         if point.get("latitude") and point.get("longitude"):
-            # Add each point's (longitude, latitude, altitude) as a coordinate for the line
-            coordinates.append((point['longitude'], point['latitude'], point.get('altitude', 0)))
+            # Add each point's (long, lat, alt) as a coordinate to the line
+            coordinates.append((point["longitude"], point["latitude"], point["altitude"]))
 
     line_geometry = LineString(coordinates)
     
@@ -564,7 +605,7 @@ def generate_kml(trip_data, output_file="output_as_kml.kml"):
     start_point = trip_data[0]
     start_placemark = kml.Placemark()
     start_placemark.name = "Start"
-    start_placemark.geometry = Point(start_point['longitude'], start_point['latitude'], start_point.get('altitude', 0))
+    start_placemark.geometry = Point(start_point["longitude"], start_point["latitude"], start_point["altitude"])
     
     kml_document.append(start_placemark)
 
@@ -572,7 +613,7 @@ def generate_kml(trip_data, output_file="output_as_kml.kml"):
     end_point = trip_data[-1]
     end_placemark = kml.Placemark()
     end_placemark.name = "End"
-    end_placemark.geometry = Point(end_point['longitude'], end_point['latitude'], end_point.get('altitude', 0))
+    end_placemark.geometry = Point(end_point["longitude"], end_point["latitude"], end_point["altitude"])
     
     kml_document.append(end_placemark)
     
@@ -586,52 +627,42 @@ def generate_kml(trip_data, output_file="output_as_kml.kml"):
 def main():
     filename = sys.argv[1]
     trip_data = parsed_gps_lines(filename)
-    #Q1-2 
+    # Q1-2 
     date, time = trip_date_occurance(trip_data)
 
-    #Q3-6 
+    # Q3-6 
     RIT_location = (43.086065, -77.68094333)
     kinsman_res_location = (43.138238, -77.437821)
 
     trip_start_near_drk = lambda: "Yes" if trip_started_near_location(trip_data, kinsman_res_location, 0.28) else "No"    
-    #print(f"Did the trip start near Dr. K's house? {trip_start_near_drk()}")
-    
+
     trip_end_near_rit = lambda: "Yes" if trip_ended_near_location(trip_data, RIT_location, 0.93) else "No"
-    #print(f"Did the trip go to RIT? {trip_end_near_rit()}")
-    
-    #tighter bound for 'start AT' location
+
+    # Tighter bound for 'start AT' location
     trip_start_at_rit = lambda: "Yes" if trip_started_near_location(trip_data, RIT_location, 0.8) else "No"    
-    #print(f"Did the trip originate at RIT? {trip_start_at_rit()}")
 
-    #tighter bound for 'start AT' location, within 30m 
+    # Tighter bound for 'start AT' location, within 30m 
     trip_end_near_drk = lambda: "Yes" if trip_ended_near_location(trip_data, kinsman_res_location, 0.03) else "No"
-    #print(f"Did the trip go to Dr. K's House? {trip_end_near_drk()}")
     
-
     # Q7
     was_full_trip = lambda: "Yes" if check_if_full_trip(trip_data) else "No"
-    #print(f"Was the trip a full trip? {was_full_trip()}")
-   
+
     # Q8
     duration = compute_trip_duration(trip_data)
-    #print("Trip Duration: ", duration)
-    
+
     # Q9
     stops = how_many_stops(trip_data)
-    #print("Number of complete stops: ", stops)
-
+    
     # Q10-11
     uphill_percent, uphill_duration = compute_uphill_duration(duration, trip_data)
-    #print(f"Percent of time spent traveling uphill: {uphill_percent}")
-    #print(f"Time spent traveling uphill: {uphill_duration}")
 
     # Q12
     total_climb, hills = compute_hill_climbs(trip_data)
-    #print(f"Total hills climbed: {len(hills)}")
+
     # Q13
     num_of_brakes = check_brake_rate(trip_data)
-    #print(f"Times breaks were 'slammed': {num_of_brakes}")
-
+    
+    # Q14-15
     generate_kml(trip_data)
     
     # Q/A pretty-printing: 
