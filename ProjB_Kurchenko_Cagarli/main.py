@@ -225,14 +225,17 @@ def is_near_location(coord, target, radius=0.5):
     distance = EARTH_RADIUS_KM * c
 
     return distance <= radius
-
-
-# Determines if the trip started near a given location.
+ 
+"""
+Determines if the trip started near a given location.
+"""
 def trip_started_near_location(trip_data, target_location, radius=2):
     start_point = (trip_data[0]['latitude'], trip_data[0]['longitude'])
     return is_near_location(start_point, target_location, radius)
 
-# Determines if the trip ended near a given location.
+"""
+Determines if the trip ended near a given location.
+"""
 def trip_ended_near_location(trip_data, location_b, radius=2):
     lat = trip_data[-1]['latitude']
     long = trip_data[-1]['longitude']
