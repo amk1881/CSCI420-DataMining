@@ -5,17 +5,16 @@ Anna Kurchenko and Lindsay Cagarli
 
 '''
 
-import re
 import sys
 from fastkml import kml
-from fastkml.styles import Style, LineStyle, IconStyle
+from fastkml.styles import Style, LineStyle
 from shapely.geometry import LineString, Point
 from datetime import datetime, timedelta
 from geopy.distance import geodesic
-from math import radians, sin, cos, sqrt, atan2
-from math import atan, degrees, sqrt
+from math import radians, sin, cos, sqrt, atan2, atan, degrees, sqrt
 
-# site to auto-parse gps data for checking: https://swairlearn.bluecover.pt/nmea_analyser
+
+# Site to auto-parse gps data for checking: https://swairlearn.bluecover.pt/nmea_analyser
 
 # Constants
 MIN_SPEED_THRESHOLD = 0.5                   # Minimum speed in m/s for valid data
@@ -28,7 +27,7 @@ BRAKE_THRESHOLD = 0.5                       # Threshold to determine a harder br
 DATA_START_REGEX = r'^\$GPRMC'              # Data starts with this regex
 VALID_FIX_QUALITY = {1, 2}                  # Acceptable fix qualities (e.g., 1 for GPS fix, 2 for DGPS fix)
 EARTH_RADIUS_M = 6371000                    # Earth's radius in meters
-EARTH_RADIUS_KM = 6371.0                      # Earth's radius in kilometers
+EARTH_RADIUS_KM = 6371.0                    # Earth's radius in kilometers
 KML_NAMESPACE = '{http://www.opengis.net/kml/2.2}'
 
 '''
@@ -40,7 +39,7 @@ KML_NAMESPACE = '{http://www.opengis.net/kml/2.2}'
 def parse_GPRMC(fields, parsed_line): 
     time_utc = fields[1]
     status = fields[2]
-    if status == "V": #V means invalid data 
+    if status == "V": # V means invalid data 
         return {}
     latitude_ddmm = float(fields[3]) if fields[3] else None
     lat_dir = fields[4]
@@ -68,7 +67,7 @@ def parse_GPRMC(fields, parsed_line):
         if long_dir == 'W':  # West longitudes are negative
             longitude = -longitude
 
-    try: # catch faulty dates and skip
+    try: # Catch faulty dates and skip
         datetime_utc = datetime.strptime(date + time_utc[:6], '%d%m%y%H%M%S')
     except: return {}
 
@@ -92,7 +91,7 @@ def parse_GPRMC(fields, parsed_line):
 def parse_GPGGA(fields, parsed_line): 
     altitude = float(fields[9]) if fields[9] else None
     fix_quality = int(fields[6]) if fields[6] else None
-    if altitude is None: #faulty GPGGA line
+    if altitude is None: # Faulty GPGGA line
         return {}
 
     parsed_line["altitude"] = altitude
@@ -116,59 +115,57 @@ def parsed_gps_lines(filename):
 
             if line1.startswith('$GPRMC'):
                 line2 = file.readline().strip()
-                #print("line1 is :" , line1, "line2 is :" , line2, "\n")
 
-                # correct case 
+                # Correct case 
                 if not '$GPGGA' in line1:
                     fields = line1.split(',')        
                     parsed_line = parse_GPRMC(fields, parsed_line)
 
                     if line2.startswith('$GPGGA'):
-                        # correct case 
+                        # Correct case 
                         if not '$GPRMC' in line2:
                             fields = line2.split(',')        
                             parsed_line = parse_GPGGA(fields, parsed_line)
 
                         # This happens if arduino eats a nl 
                         elif '$GPRMC' in line2 or 'lng' in line2:
-                            fields = line2.split('$')[1].split(',')        #After 1st $ before lng
+                            fields = line2.split('$')[1].split(',')        # After 1st $ before lng
                             parsed_line = parse_GPGGA(fields, parsed_line)
-                            #do not use lng or next line's GRMPC if present
+                            # Do not use lng or next line's GRMPC if present
                     else : 
                         # Means we have no altitude, skip this data point 
                         parsed_line = {}
 
                 # This happens if arduino eats a nl 
                 elif '$GPGGA' in line1:
-                    fields = line1.split('$')[1].split(',')        #After 1st $
+                    fields = line1.split('$')[1].split(',')        # After 1st $
                     parsed_line = parse_GPRMC(fields, parsed_line)
 
-                    fields = line1.split('$')[2].split(',')        #After 2nd $ 
+                    fields = line1.split('$')[2].split(',')        # After 2nd $ 
                     parsed_line = parse_GPGGA(fields, parsed_line)
-                    #After this jumps to next final condition
+                    # After this jumps to next final condition
             
 
-            # pretty sure we only care about the altitude here
+            # Pretty sure we only care about the altitude here
             elif line1.startswith('$GPGGA'):
                 line2 = file.readline().strip()
-                #print("line1 is :" , line1, "line2 is :" , line2, "\n")
 
-                # correct case 
+                # Correct case 
                 if not '$GPRMC' in line1:
                     fields = line1.split(',')        
                     parsed_line = parse_GPGGA(fields, parsed_line)
 
                     if line2.startswith('$GPRMC'):
-                        # correct case 
+                        # Correct case 
                         if not '$GPGGA' in line2:
                             fields = line2.split(',')        
                             parsed_line = parse_GPRMC(fields, parsed_line)
 
                         # This happens if arduino eats a nl 
                         elif ('$GPGGA' in line2) or ('lng' in line2):
-                            fields = line2.split('$')[1].split(',')        #After 1st $ before lng
+                            fields = line2.split('$')[1].split(',')        # After 1st $ before lng
                             parsed_line = parse_GPRMC(fields, parsed_line)
-                            #do not use lng or next line's GRMPC if present
+                            # Do not use lng or next line's GRMPC if present
                         
                     else : 
                         # Means we have no GRMPC data, skip this datapoint 
@@ -176,16 +173,16 @@ def parsed_gps_lines(filename):
 
                 # This happens if arduino eats a nl 
                 elif '$GPRMC' in line1:
-                    fields = line1.split('$')[1].split(',')        #After 1st $
+                    fields = line1.split('$')[1].split(',')        # After 1st $
                     parsed_line = parse_GPGGA(fields, parsed_line)
 
-                    fields = line1.split('$')[2].split(',')        #After 2nd $ 
+                    fields = line1.split('$')[2].split(',')        # After 2nd $ 
                     parsed_line = parse_GPRMC(fields, parsed_line)
-                    #After this jumps to next final condition
+                    # After this jumps to next final condition
             
 
-            #If no GRMPC/GPGGA line skip this data 
-            #Can add in lng line parsing to minimize skipped data
+            # If no GRMPC/GPGGA line skip this data 
+            # Can add in lng line parsing to minimize skipped data
             else: 
                 parsed_line = {}
 
